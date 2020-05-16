@@ -1,6 +1,9 @@
+import argparse
 import math
-import pygame as pg
+import os
 from PIL import Image, ImageTk
+os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
+import pygame as pg
 
 BG_COLOR = (44, 47, 51)
 
@@ -49,7 +52,7 @@ class Piece():
 
 class Puzzle():
     def __init__(self, img_path, W, H, downscale=-1, margin=1):
-        if W % 2 == 0 or H % 2 == 0: raise ValueError("Puzzle dimensions must be odd")
+        if W % 2 == 0 or H % 2 == 0: raise ValueError("Puzzle dimensions must be positive and odd")
         img = Image.open(img_path)
         img_w, img_h = img.size
 
@@ -255,6 +258,35 @@ class Puzzle():
         
 
 def main():
+    parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter, description="""
+Do a jigsaw puzzle. The port (default 7777) must be forwarded to host an online game.
+
+    Start a 3x3 offline game:
+
+        python3 jigsaw.py -o -i rock.png -s 3 3
+
+    Join an online game:
+
+        python3 jigsaw.py -c 8.8.8.8
+
+    Host an 11x11 online game:
+
+        python3 jigsaw.py -i itachi.png -s 11 11""")
+
+    parser.add_argument('-o', '--offline', help="Play offline",
+                        action='store_true', default=False)
+    parser.add_argument('-c', '--connect', help="Connect to a puzzle server",
+                        metavar='IP_ADDRESS', default=False)
+    parser.add_argument('-p', '--port', help="Port to connect to or host from",
+                        type=int, default=7777)
+    parser.add_argument('-d', '--downscale', help="Downscale the resolution of the puzzle's largest dimension",
+                        type=int, default=-1)
+    parser.add_argument('-i', '--image', help="Image to make the puzzle out of",
+                        default="")
+    parser.add_argument('-s', '--size', help="Puzzle size (must be odd)",
+                        nargs=2, type=int, default=False)
+    args = parser.parse_args()
+
     pg.init()
     try:
         pg.mixer.init()
@@ -264,7 +296,7 @@ def main():
     sw, sh = 1500, 1000
     screen = pg.display.set_mode([sw, sh], flags=display_flags)
     print("Building puzzle...")
-    puzzle = Puzzle("rock.png", 9, 7)
+    puzzle = Puzzle(args.image, args.size[0], args.size[1], downscale=args.downscale)
     print("Done.")
     pw, ph = puzzle.surface.get_width(), puzzle.surface.get_height()
 
