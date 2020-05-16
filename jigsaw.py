@@ -184,14 +184,12 @@ def main():
     puzzle = Puzzle("rock.png", 9, 7)
     pw, ph = puzzle.surface.get_width(), puzzle.surface.get_height()
 
-    # scale = 1000 / max(pw, ph)
-    scale = 1
+    scale = sw / max(pw, ph)
     scale_factor = 10 / 9
 
     panning = False
-    pan_x, pan_y = 0, 0
-    # pan_x = pw / 2 - sw / 2
-    # pan_y = ph / 2 - sh / 2
+    pan_x = pw / 2 - sw / scale / 2
+    pan_y = ph / 2 - sh / scale / 2
 
     running = True
     while running:
@@ -212,18 +210,15 @@ def main():
                     pass
                 elif event.button == 3:
                     panning = True
-                elif event.button == 4:
-                    pan_x = (pan_x + sw / 2) / scale
-                    pan_y = (pan_y + sh / 2) / scale
-                    scale *= scale_factor
-                    pan_x = pan_x * scale - sw / 2
-                    pan_y = pan_y * scale - sh / 2
-                elif event.button == 5:
-                    pan_x = (pan_x + sw / 2) / scale
-                    pan_y = (pan_y + sh / 2) / scale
-                    scale /= scale_factor
-                    pan_x = pan_x * scale - sw / 2
-                    pan_y = pan_y * scale - sh / 2
+                elif event.button in (4, 5):
+                    pan_x += sw / scale / 2
+                    pan_y += sh / scale / 2
+                    if event.button == 4:
+                        scale *= scale_factor
+                    else:
+                        scale /= scale_factor
+                    pan_x -= sw / scale / 2
+                    pan_y -= sw / scale / 2
             elif event.type == pg.MOUSEBUTTONUP:
                 if event.button == 1:
                     pass
@@ -234,25 +229,33 @@ def main():
                     pan_x -= event.rel[0] / scale
                     pan_y -= event.rel[1] / scale
 
-        ss_x, ss_y = pan_x, pan_y
-        blit_x, blit_y = 0, 0
-        ss_width = sw / scale
-        ss_height = sh / scale
+        ss_width = min(max(1, sw / scale), pw)
+        ss_height = min(max(1, sh / scale), ph)
 
         if pan_x < 0:
             ss_x = 0
             blit_x = int(-pan_x * scale)
+        else:
+            ss_x = min(pan_x, pw)
+            blit_x = 0
+
+        if pan_x > pw - ss_width:
+            ss_width = max(pw - pan_x, 0)
+
         if pan_y < 0:
             ss_y = 0
             blit_y = int(-pan_y * scale)
-        if ss_x + ss_width > pw:
-            ss_width = pw - ss_x
-        if ss_y + ss_height > ph:
-            ss_height = ph - ss_y
+        else:
+            ss_y = min(pan_y, ph)
+            blit_y = 0
+
+        if pan_y > ph - ss_height:
+            ss_height = max(ph - pan_y, 0)
+
 
         screen.fill(BG_COLOR)
-        print(scale)
-        print((ss_width, ss_height, blit_x, blit_y))
+        print(scale, pw, ph)
+        print((ss_x, ss_y, ss_width, ss_height))
         subsurf = puzzle.surface.subsurface(int(ss_x), int(ss_y), int(ss_width), int(ss_height))
         screen.blit(pg.transform.scale(subsurf, (int(ss_width * scale), int(ss_height * scale))), (blit_x, blit_y))
         pg.display.flip()
