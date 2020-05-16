@@ -46,7 +46,7 @@ class Piece():
 
 
 class Puzzle():
-    def __init__(self, img_path, W, H, downscale=-1):
+    def __init__(self, img_path, W, H, downscale=-1, margin=1):
         if W % 2 == 0 or H % 2 == 0: raise ValueError("Puzzle dimensions must be odd")
         img = Image.open(img_path)
         img_w, img_h = img.size
@@ -60,10 +60,9 @@ class Puzzle():
                 img_h = downscale
             img = img.resize((img_w, img_h))
 
-        self.scale = 1
-        self.surface = pg.Surface((img_w * 3, img_h * 3))
-        self.surface.fill(BG_COLOR)
-        pg.draw.rect(self.surface, (0, 0, 0), (img_w, img_h, img_w, img_h))
+        self.margin = margin
+        self.surface = pg.Surface((img_w * (margin * 2 + 1), img_h * (margin * 2 + 1)))
+        self.draw_order = list(range(W * H))
 
         piece_w, piece_h = img_w / W, img_h / H
         base_mask = Image.open("mask.png")
@@ -82,7 +81,6 @@ class Puzzle():
         self.x_ext, self.y_ext = x_ext, y_ext
 
         self.pieces = []
-        self.moved_pieces = []
         for r in range(H):
             for c in range(W):
                 if (r == 0 and c == 0):
@@ -169,27 +167,50 @@ class Puzzle():
                 mask = mask.resize(crop.size)
                 piece = Piece(Image.composite(crop, mask, mask), ptype, r, c, x_ext, y_ext)
                 self.pieces.append(piece)
-                piece.x = c * piece_w + img_w
-                piece.y = r * piece_h + img_h
-                sprite = pg.transform.scale(piece.sprite, (int(piece.sprite.get_width() * self.scale),
-                                                        int(piece.sprite.get_height() * self.scale)))
-                self.surface.blit(sprite, (piece.sx() * self.scale, piece.sy() * self.scale))
+                piece.x = c * piece_w + img_w * margin
+                piece.y = r * piece_h + img_h * margin
+
+    
+    def click_check(self, x, y):
+        for i in range(len(self.pieces) - 1, -1, -1):
+            p = self.pieces[i]
+            if (p.x < x < p.x + self.piece_w and
+                p.y < y < p.y + self.piece_h):
+                self.pieces.pop(i)
+                self.pieces.append(p)
+                return p
+        return None
+    
+    def move_piece(self, piece, dx, dy):
+        piece.x = min(max(0, piece.x + dx), self.surface.get_width() - self.piece_w)
+        piece.y = min(max(0, piece.y + dy), self.surface.get_height() - self.piece_h)
+        self.pieces.remove(piece)
+        self.pieces.append(piece)
             
+    
+    def draw(self):
+        self.surface.fill(BG_COLOR)
+        pg.draw.rect(self.surface, (0, 0, 0),
+                     (self.img_w * self.margin, self.img_h * self.margin, self.img_w, self.img_h))
+        for p in self.pieces:
+            self.surface.blit(p.sprite, (p.sx(), p.sy()))
 
 def main():
     pg.init()
     display_flags = pg.RESIZABLE
-    sw, sh = 1000, 1000
+    sw, sh = 1500, 1000
     screen = pg.display.set_mode([sw, sh], flags=display_flags)
     puzzle = Puzzle("rock.png", 9, 7)
     pw, ph = puzzle.surface.get_width(), puzzle.surface.get_height()
 
-    scale = sw / max(pw, ph)
+    scale = min(sw / pw, sh / ph)
     scale_factor = 10 / 9
 
     panning = False
     pan_x = pw / 2 - sw / scale / 2
     pan_y = ph / 2 - sh / scale / 2
+
+    holding = None
 
     running = True
     while running:
@@ -200,14 +221,14 @@ def main():
                 if event.key == pg.K_ESCAPE:
                     running = False
                 elif event.key == pg.K_SPACE:
-                    pan_x = pw / 2 - sw / 2
-                    pan_y = ph / 2 - sh / 2
+                    pan_x = pw / 2 - sw / scale / 2
+                    pan_y = ph / 2 - sh / scale / 2
             elif event.type == pg.VIDEORESIZE:
                 sw, sh = event.w, event.h
                 screen = pg.display.set_mode([sw, sh], flags=display_flags)
             elif event.type == pg.MOUSEBUTTONDOWN:
                 if event.button == 1:
-                    pass
+                    holding = puzzle.click_check(pan_x + event.pos[0] / scale, pan_y + event.pos[1] / scale)
                 elif event.button == 3:
                     panning = True
                 elif event.button in (4, 5):
@@ -218,16 +239,20 @@ def main():
                     else:
                         scale /= scale_factor
                     pan_x -= sw / scale / 2
-                    pan_y -= sw / scale / 2
+                    pan_y -= sh / scale / 2
             elif event.type == pg.MOUSEBUTTONUP:
                 if event.button == 1:
-                    pass
+                    holding = None
                 elif event.button == 3:
                     panning = False
             elif event.type == pg.MOUSEMOTION:
+                mx = event.rel[0] / scale
+                my = event.rel[1] / scale
                 if panning:
-                    pan_x -= event.rel[0] / scale
-                    pan_y -= event.rel[1] / scale
+                    pan_x -= mx
+                    pan_y -= my
+                if holding != None:
+                    puzzle.move_piece(holding, mx, my)
 
         ss_width = min(max(1, sw / scale), pw)
         ss_height = min(max(1, sh / scale), ph)
@@ -254,11 +279,11 @@ def main():
 
 
         screen.fill(BG_COLOR)
-        print(scale, pw, ph)
-        print((ss_x, ss_y, ss_width, ss_height))
+        puzzle.draw()
         subsurf = puzzle.surface.subsurface(int(ss_x), int(ss_y), int(ss_width), int(ss_height))
         screen.blit(pg.transform.scale(subsurf, (int(ss_width * scale), int(ss_height * scale))), (blit_x, blit_y))
         pg.display.flip()
+
     pg.quit()
 
 
