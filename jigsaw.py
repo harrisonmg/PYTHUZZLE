@@ -28,6 +28,8 @@ class Piece():
         self.row, self.col = row, col
         self.x_ext, self.y_ext = x_ext, y_ext
         self.x, self.y = 0, 0
+        self.group = set([self])
+        self.locked = False
 
 
     def sx(self):
@@ -60,8 +62,8 @@ class Puzzle():
                 img_h = downscale
             img = img.resize((img_w, img_h))
 
-        self.margin = margin
         self.surface = pg.Surface((img_w * (margin * 2 + 1), img_h * (margin * 2 + 1)))
+        self.origin_x, self.origin_y = img_w * margin, img_h * margin
         self.draw_order = list(range(W * H))
 
         piece_w, piece_h = img_w / W, img_h / H
@@ -79,8 +81,10 @@ class Puzzle():
         self.img, self.img_w, self.img_h = img, img_w, img_h
         self.piece_w, self.piece_h = piece_w, piece_h
         self.x_ext, self.y_ext = x_ext, y_ext
+        self.connect_tol = min(piece_w, piece_h) / 5
 
         self.pieces = []
+        self.matrix = {}
         for r in range(H):
             for c in range(W):
                 if (r == 0 and c == 0):
@@ -167,14 +171,16 @@ class Puzzle():
                 mask = mask.resize(crop.size)
                 piece = Piece(Image.composite(crop, mask, mask), ptype, r, c, x_ext, y_ext)
                 self.pieces.append(piece)
-                piece.x = c * piece_w + img_w * margin
-                piece.y = r * piece_h + img_h * margin
+                self.matrix[(r, c)] = piece
+                piece.x = c * piece_w + self.origin_x
+                piece.y = r * piece_h + self.origin_y
 
     
     def click_check(self, x, y):
         for i in range(len(self.pieces) - 1, -1, -1):
             p = self.pieces[i]
-            if (p.x < x < p.x + self.piece_w and
+            if (not p.locked and
+                p.x < x < p.x + self.piece_w and
                 p.y < y < p.y + self.piece_h):
                 self.pieces.pop(i)
                 self.pieces.append(p)
@@ -182,25 +188,84 @@ class Puzzle():
         return None
     
     def move_piece(self, piece, dx, dy):
-        piece.x = min(max(0, piece.x + dx), self.surface.get_width() - self.piece_w)
-        piece.y = min(max(0, piece.y + dy), self.surface.get_height() - self.piece_h)
-        self.pieces.remove(piece)
-        self.pieces.append(piece)
+        for p in piece.group:
+            p.x = min(max(0, p.x + dx), self.surface.get_width() - self.piece_w)
+            p.y = min(max(0, p.y + dy), self.surface.get_height() - self.piece_h)
+            self.pieces.remove(p)
+            self.pieces.append(p)
             
     
     def draw(self):
         self.surface.fill(BG_COLOR)
-        pg.draw.rect(self.surface, (0, 0, 0),
-                     (self.img_w * self.margin, self.img_h * self.margin, self.img_w, self.img_h))
+        pg.draw.rect(self.surface, (0, 0, 0), (self.origin_x, self.origin_y, self.img_w, self.img_h))
         for p in self.pieces:
             self.surface.blit(p.sprite, (p.sx(), p.sy()))
 
+    def complete(self):
+        return len(self.pieces[0].group) == self.W * self.H
+    
+    def connection_check(self, piece):
+        def check_single(other, tx, ty):
+            dx, dy = tx - piece.x, ty - piece.y
+            if (abs(dx) < self.connect_tol and
+                abs(dy) < self.connect_tol):
+                self.move_piece(piece, dx, dy)
+                new_group = piece.group.union(other.group)
+                for p in new_group:
+                    p.group = new_group
+                    p.locked = other.locked
+
+        n = self.matrix.get((piece.row - 1, piece.col), None)
+        if n != None and n not in piece.group:
+            check_single(n, n.x, n.y + self.piece_h)
+
+        n = self.matrix.get((piece.row, piece.col - 1), None)
+        if n != None and n not in piece.group:
+            check_single(n, n.x + self.piece_w, n.y)
+
+        n = self.matrix.get((piece.row + 1, piece.col), None)
+        if n != None and n not in piece.group:
+            check_single(n, n.x, n.y - self.piece_h)
+
+        n = self.matrix.get((piece.row, piece.col + 1), None)
+        if n != None and n not in piece.group:
+            check_single(n, n.x - self.piece_w, n.y)
+        
+        def check_corner(tx, ty):
+            if (abs(tx) < self.connect_tol and
+                abs(ty) < self.connect_tol):
+                self.move_piece(piece, tx, ty)
+                for p in piece.group:
+                    p.locked = True
+
+        if (piece.row == 0):
+            if (piece.col == 0):
+                check_corner(self.origin_x - piece.x,
+                             self.origin_y - piece.y)
+            elif (piece.col == self.W - 1):
+                check_corner(self.origin_x + self.img_w - self.piece_w - piece.x,
+                             self.origin_y - piece.y)
+        if (piece.row == self.H - 1):
+            if (piece.col == 0):
+                check_corner(self.origin_x - piece.x,
+                             self.origin_y + self.img_h - self.piece_h - piece.y)
+            elif (piece.col == self.W - 1):
+                check_corner(self.origin_x + self.img_w - self.piece_w - piece.x,
+                             self.origin_y + self.img_h - self.piece_h - piece.y)
+        
+
 def main():
     pg.init()
+    try:
+        pg.mixer.init()
+    except pg.error:
+        pass
     display_flags = pg.RESIZABLE
     sw, sh = 1500, 1000
     screen = pg.display.set_mode([sw, sh], flags=display_flags)
+    print("Building puzzle...")
     puzzle = Puzzle("rock.png", 9, 7)
+    print("Done.")
     pw, ph = puzzle.surface.get_width(), puzzle.surface.get_height()
 
     scale = min(sw / pw, sh / ph)
@@ -242,7 +307,10 @@ def main():
                     pan_y -= sh / scale / 2
             elif event.type == pg.MOUSEBUTTONUP:
                 if event.button == 1:
-                    holding = None
+                    if holding != None:
+                        for p in holding.group:
+                            puzzle.connection_check(p)
+                        holding = None
                 elif event.button == 3:
                     panning = False
             elif event.type == pg.MOUSEMOTION:
@@ -277,12 +345,16 @@ def main():
         if pan_y > ph - ss_height:
             ss_height = max(ph - pan_y, 0)
 
-
         screen.fill(BG_COLOR)
         puzzle.draw()
         subsurf = puzzle.surface.subsurface(int(ss_x), int(ss_y), int(ss_width), int(ss_height))
         screen.blit(pg.transform.scale(subsurf, (int(ss_width * scale), int(ss_height * scale))), (blit_x, blit_y))
         pg.display.flip()
+        
+        if puzzle.complete() and pg.mixer.get_init() and not pg.mixer.music.get_busy():
+            pg.mixer.music.load('congrats.wav')
+            pg.mixer.music.Sound.set_volume(1)
+            pg.mixer.music.play(-1)
 
     pg.quit()
 
