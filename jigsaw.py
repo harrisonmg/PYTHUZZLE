@@ -4,8 +4,18 @@ import os
 from PIL import Image, ImageTk
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 import pygame as pg
+import socket
+import socketserver
 
 BG_COLOR = (44, 47, 51)
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+
+def rect_overlap(r1, r2):
+    return (r1[0] < r2[0] + r2[2] and
+            r1[0] + r1[2] > r2[0] and
+            r1[1] < r2[1] + r2[3] and
+            r1[1] + r1[3] > r2[1])
 
 class Piece():
     # piece types
@@ -33,8 +43,13 @@ class Piece():
         self.x, self.y = 0, 0
         self.group = set([self])
         self.locked = False
+        self.last_pos = None
 
 
+    def spos(self):
+        return (self.sx(), self.sy())
+
+    
     def sx(self):
         if self.ptype in (self.TRC, self.BRC, self.BEE,
                           self.TEE, self.ROE, self.MID):
@@ -65,9 +80,8 @@ class Puzzle():
                 img_h = downscale
             img = img.resize((img_w, img_h))
 
-        self.surface = pg.Surface((img_w * (margin * 2 + 1), img_h * (margin * 2 + 1)))
+        self.w, self.h = img_w * (margin * 2 + 1), img_h * (margin * 2 + 1)
         self.origin_x, self.origin_y = img_w * margin, img_h * margin
-        self.draw_order = list(range(W * H))
 
         piece_w, piece_h = img_w / W, img_h / H
         base_mask = Image.open("mask.png")
@@ -189,23 +203,49 @@ class Puzzle():
                 self.pieces.append(p)
                 return p
         return None
+
     
     def move_piece(self, piece, dx, dy):
         for p in piece.group:
-            p.x = min(max(0, p.x + dx), self.surface.get_width() - self.piece_w)
-            p.y = min(max(0, p.y + dy), self.surface.get_height() - self.piece_h)
+            if (p.sx() + dx < 0 or p.sx() + dx + p.w > self.w):
+                dx = 0
+            if (p.sy() + dy < 0 or p.sy() + dy + p.h > self.w):
+                dy = 0
+            if dx == 0 and dy == 0:
+                break
+        for p in piece.group:
+            if p.last_pos == None:
+                p.last_pos = p.spos()
+            p.x += dx
+            p.y += dy
             self.pieces.remove(p)
             self.pieces.append(p)
             
     
-    def draw(self):
-        self.surface.fill(BG_COLOR)
-        pg.draw.rect(self.surface, (0, 0, 0), (self.origin_x, self.origin_y, self.img_w, self.img_h))
+    def subsurface(self, ss_x, ss_y, ss_width, ss_height, scale):
+        scale_dims = (int(ss_width * scale), int(ss_height * scale))
+        frame = pg.Surface(scale_dims, flags=pg.HWSURFACE)
+        frame.fill(BG_COLOR)
+        rx = max(self.origin_x, ss_x)
+        ry = max(self.origin_y, ss_y)
+        rw = min(self.origin_x + self.img_w, ss_x + ss_width) - rx
+        rh = min(self.origin_y + self.img_h, ss_y + ss_height) - ry
+        rx -= ss_x
+        ry -= ss_y
+        if rw > 0 and rh > 0:
+            pg.draw.rect(frame, BLACK, (int(rx * scale), int(ry * scale), int(rw * scale), int(rh * scale)))
+
         for p in self.pieces:
-            self.surface.blit(p.sprite, (p.sx(), p.sy()))
+            if rect_overlap((ss_x, ss_y, ss_width, ss_height), (p.sx(), p.sy(), p.w, p.h)):
+                frame.blit(pg.transform.scale(p.sprite, (int(p.w * scale), int(p.h * scale))),
+                           (int((p.sx() - ss_x) * scale), int((p.sy() - ss_y) * scale)))
+
+        return frame
+
 
     def complete(self):
         return len(self.pieces[0].group) == self.W * self.H
+
     
     def connection_check(self, piece):
         def check_single(other, tx, ty):
@@ -287,19 +327,41 @@ Do a jigsaw puzzle. The port (default 7777) must be forwarded to host an online 
                         nargs=2, type=int, default=False)
     args = parser.parse_args()
 
+    # if not args.offline:
+    #     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    # elif args.connect:
+    #     print("Connecting to server...")
+    #     sock.connect((args.connect, args.port))
+    #     print("Done.")
+    #     sock.send("IMAGE")
+
+    #     while True: pass
+    # else:
+    #     print("Starting server...")
+    #     host = True
+    #     sock.bind((socket.gethostname(), args.port))
+    #     sock.listen(5)
+    #     print("Done.")
+
+    if args.offline:
+        image = args.image
+        size = args.size
+
     pg.init()
     try:
         pg.mixer.init()
     except pg.error:
         pass
+
     display_flags = pg.RESIZABLE
+    print("Building puzzle...")
+    puzzle = Puzzle(image, size[0], size[1], downscale=args.downscale)
+    print("Done.")
+
     sw, sh = 1500, 1000
     screen = pg.display.set_mode([sw, sh], flags=display_flags)
-    print("Building puzzle...")
-    puzzle = Puzzle(args.image, args.size[0], args.size[1], downscale=args.downscale)
-    print("Done.")
-    pw, ph = puzzle.surface.get_width(), puzzle.surface.get_height()
 
+    pw, ph = puzzle.w, puzzle.h
     scale = min(sw / pw, sh / ph)
     scale_factor = 10 / 9
 
@@ -364,9 +426,6 @@ Do a jigsaw puzzle. The port (default 7777) must be forwarded to host an online 
             ss_x = min(pan_x, pw)
             blit_x = 0
 
-        if pan_x > pw - ss_width:
-            ss_width = max(pw - pan_x, 0)
-
         if pan_y < 0:
             ss_y = 0
             blit_y = int(-pan_y * scale)
@@ -374,13 +433,14 @@ Do a jigsaw puzzle. The port (default 7777) must be forwarded to host an online 
             ss_y = min(pan_y, ph)
             blit_y = 0
 
+        if pan_x > pw - ss_width:
+            ss_width = max(pw - pan_x, 0)
+
         if pan_y > ph - ss_height:
             ss_height = max(ph - pan_y, 0)
 
         screen.fill(BG_COLOR)
-        puzzle.draw()
-        subsurf = puzzle.surface.subsurface(int(ss_x), int(ss_y), int(ss_width), int(ss_height))
-        screen.blit(pg.transform.scale(subsurf, (int(ss_width * scale), int(ss_height * scale))), (blit_x, blit_y))
+        screen.blit(puzzle.subsurface(int(ss_x), int(ss_y), int(ss_width), int(ss_height), scale), (blit_x, blit_y))
         pg.display.flip()
         
         if puzzle.complete() and pg.mixer.get_init() and not pg.mixer.music.get_busy():
