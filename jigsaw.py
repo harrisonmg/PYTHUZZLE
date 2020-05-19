@@ -4,6 +4,7 @@ import os
 from PIL import Image, ImageTk
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 import pygame as pg
+import random
 import socket
 import socketserver
 
@@ -34,8 +35,9 @@ class Piece():
     MID = 12
     MDR = 13
 
-    def __init__(self, img, ptype, row, col, x_ext, y_ext):
+    def __init__(self, img, crop, ptype, row, col, x_ext, y_ext):
         self.sprite = pg.image.fromstring(img.tobytes("raw", 'RGBA'), img.size, 'RGBA')
+        self.crop = pg.image.fromstring(crop.tobytes("raw", 'RGB'), crop.size, 'RGB')
         self.w, self.h = img.size
         self.ptype = ptype
         self.row, self.col = row, col
@@ -44,6 +46,8 @@ class Piece():
         self.group = set([self])
         self.locked = False
         self.last_pos = None
+        self.adj = None
+        self.low = False
 
 
     def spos(self):
@@ -66,7 +70,7 @@ class Piece():
 
 
 class Puzzle():
-    def __init__(self, img_path, W, H, downscale=-1, margin=1):
+    def __init__(self, img_path, W, H, downscale=-1, margin=2):
         if W % 2 == 0 or H % 2 == 0: raise ValueError("Puzzle dimensions must be positive and odd")
         img = Image.open(img_path)
         img_w, img_h = img.size
@@ -186,11 +190,20 @@ class Puzzle():
                                     (c + 1) * piece_w, (r + 1) * piece_h + y_ext))
 
                 mask = mask.resize(crop.size)
-                piece = Piece(Image.composite(crop, mask, mask), ptype, r, c, x_ext, y_ext)
+                piece = Piece(Image.composite(crop, mask, mask), crop, ptype, r, c, x_ext, y_ext)
                 self.pieces.append(piece)
                 self.matrix[(r, c)] = piece
-                piece.x = c * piece_w + self.origin_x
-                piece.y = r * piece_h + self.origin_y
+
+                if (random.choice([True, False])):
+                    piece.x = random.choice([random.randrange(int(img_w / 2), int(self.origin_x - piece.w)),
+                                            random.randrange(int(self.origin_x + img_w + piece.x - piece.sx()),
+                                                             int(self.w - img_w / 2))])
+                    piece.y = random.randrange(int(img_h / 2), int(self.h - img_h / 2))
+                else:
+                    piece.y = random.choice([random.randrange(int(img_h / 2), int(self.origin_y - piece.h)),
+                                            random.randrange(int(self.origin_y + img_h + piece.y - piece.sy()),
+                                                             int(self.h - img_h / 2))])
+                    piece.x = random.randrange(int(img_w / 2), int(self.w - img_w / 2))
 
     
     def click_check(self, x, y):
@@ -209,7 +222,7 @@ class Puzzle():
         for p in piece.group:
             if (p.sx() + dx < 0 or p.sx() + dx + p.w > self.w):
                 dx = 0
-            if (p.sy() + dy < 0 or p.sy() + dy + p.h > self.w):
+            if (p.sy() + dy < 0 or p.sy() + dy + p.h > self.h):
                 dy = 0
             if dx == 0 and dy == 0:
                 break
@@ -238,13 +251,28 @@ class Puzzle():
         for p in self.pieces:
             if rect_overlap((ss_x, ss_y, ss_width, ss_height), (p.sx(), p.sy(), p.w, p.h)):
                 frame.blit(pg.transform.scale(p.sprite, (int(p.w * scale), int(p.h * scale))),
-                           (int((p.sx() - ss_x) * scale), int((p.sy() - ss_y) * scale)))
+                        (int((p.sx() - ss_x) * scale), int((p.sy() - ss_y) * scale)))
 
         return frame
 
 
     def complete(self):
         return len(self.pieces[0].group) == self.W * self.H
+
+        
+    def landlock_check(self, piece):
+        if piece.adj == None:
+            piece.adj = set()
+            neighbors = [self.matrix.get((piece.row - 1, piece.col), None),
+                         self.matrix.get((piece.row + 1, piece.col), None),
+                         self.matrix.get((piece.row, piece.col - 1), None),
+                         self.matrix.get((piece.row, piece.col + 1), None)]
+            for n in neighbors:
+                if n != None:
+                    piece.adj.add(n)
+        if piece.adj.issubset(piece.group):
+            piece.sprite = piece.crop.convert()
+            piece.low = True
 
     
     def connection_check(self, piece):
@@ -257,6 +285,7 @@ class Puzzle():
                 for p in new_group:
                     p.group = new_group
                     p.locked = other.locked
+                    self.landlock_check(p)
 
         n = self.matrix.get((piece.row - 1, piece.col), None)
         if n != None and n not in piece.group:
