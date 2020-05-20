@@ -1,14 +1,14 @@
 import argparse
 import multiprocessing
 import os
-import pickle
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 import pygame as pg
 import socket
 import subprocess
 import sys
+import time
 
-from constants import *
+from common import *
 from puzzle import *
 
 
@@ -26,16 +26,20 @@ class Moveplexer():
         self.sock = sock
         self.incoming_moves = multiprocessing.Queue()
         self.outgoing_moves = multiprocessing.Queue()
-        # multiprocessing.Process(target=self.)
+        self.proc = multiprocessing.Process(target=self.run)
+        self.proc.start()
     
-    def make_move(self, piece):
+
+    def send_move(self, piece):
         self.outgoing_moves.put(Move(piece))
+
 
     def get_move(self):
         if self.outgoing_moves.empty():
             return None
         else:
             return self.outgoing_moves.get()
+
         
     def update(self, puzzle):
         move = self.get_move()
@@ -44,6 +48,12 @@ class Moveplexer():
             puzzle.place_piece(p, move.x, move.y)
             puzzle.connection_check(p)
             move = self.get_move()
+
+
+    def run(self):
+        return
+    #     while True:
+    #         while not self.outgoing_moves
         
 
 def main():
@@ -76,27 +86,38 @@ Do a jigsaw puzzle. Puzzle dimensions must be odd. The port (default=7777) must 
     print(args)
 
     if args.offline:
-        image, W, H = args.offline;
+        img_path, W, H = args.offline;
+        img_str = get_img_str(img_path)
         pass
     elif args.server or args.connect:
         if args.server:
-            image, W, H = args.server;
+            img_path, W, H = args.server;
+            img_str = get_img_str(img_path)
             print("Starting server...")
             global server_process
-            server_process = subprocess.Popen(["python3", "server.py", args.port, image, W, H])
+            server_process = subprocess.Popen(["python3", "server.py", args.port, img_path, W, H])
             args.connect = socket.gethostname()
+            print(args.connect)
         else:
             print("Connecting to server...")
 
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.connect((args.connect, int(args.port)))
+        start_time = time.time()
+        while True:
+            if time.time() - start_time > 10:
+                print("Error: Could not connect to server")
+                sys.exit()
+            try:
+                sock.connect((args.connect, int(args.port)))
+                break
+            except:
+                pass
         print("Done.")
 
         # if not args.server:
         print("Downloading image...")
-        data = sock.recv(INIT_MSG_LEN)
-        img_size, W, H = pickle.loads(data)
-        print((img_size, W, H))
+        img_size, W, H = unpack_init_msg(sock.recv(INIT_MSG_LEN))
+        img_str = sock.recv(img_size).decode()
         print("Done")
 
         moveplexer = Moveplexer(sock)
@@ -112,7 +133,7 @@ Do a jigsaw puzzle. Puzzle dimensions must be odd. The port (default=7777) must 
 
     display_flags = pg.RESIZABLE
     print("Building puzzle...")
-    puzzle = Puzzle(image, int(W), int(H), downscale=args.downscale)
+    puzzle = Puzzle(img_str, int(W), int(H), downscale=args.downscale)
     print("Done.")
 
     if not args.offline: moveplexer.update(puzzle)
