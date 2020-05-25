@@ -14,6 +14,7 @@ def rect_overlap(r1, r2):
             r1[1] < r2[1] + r2[3] and
             r1[1] + r1[3] > r2[1])
 
+
 class Piece():
     # piece types
     TLC = 0

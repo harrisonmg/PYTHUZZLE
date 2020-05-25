@@ -1,10 +1,10 @@
-from PIL import Image
 import select
 import socket
 import sys
 
 from common import *
-from puzzle import *
+from puzzle import Puzzle
+
 
 def main():
     port = int(sys.argv[1])
@@ -56,7 +56,6 @@ def main():
                 to_read.remove(sock)
             else:
                 print("Error: unknown request type " + str(req))
-
 
 
 if __name__ == "__main__":

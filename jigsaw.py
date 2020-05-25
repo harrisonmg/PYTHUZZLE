@@ -2,6 +2,7 @@ import argparse
 import multiprocessing
 import os
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
+import platform
 import pygame as pg
 import socket
 import subprocess
@@ -9,7 +10,7 @@ import sys
 import time
 
 from common import *
-from puzzle import *
+from puzzle import Puzzle
 
 
 server_process = None
@@ -103,7 +104,12 @@ Do a jigsaw puzzle. Puzzle dimensions must be odd. The port (default=7777) must 
             img_str = get_img_str(img_path)
             print("Starting server...")
             global server_process
-            server_process = subprocess.Popen(["python3", "server.py", args.port, img_path, W, H])
+
+            if platform.system() == 'Linux':
+                py_cmd = "python3"
+            else:
+                py_cmd = "python"
+            server_process = subprocess.Popen([py_cmd, "server.py", args.port, img_path, W, H])
             args.connect = socket.gethostname()
         else:
             print("Connecting to server...")
@@ -208,6 +214,8 @@ Do a jigsaw puzzle. Puzzle dimensions must be odd. The port (default=7777) must 
                 if holding != None:
                     puzzle.move_piece(holding, mx, my)
 
+        pan_x
+
         ss_width = min(max(1, sw / scale), pw)
         ss_height = min(max(1, sh / scale), ph)
 
@@ -237,7 +245,7 @@ Do a jigsaw puzzle. Puzzle dimensions must be odd. The port (default=7777) must 
         
         if puzzle.complete() and pg.mixer.get_init() and not pg.mixer.music.get_busy():
             pg.mixer.music.load('congrats.wav')
-            pg.mixer.music.Sound.set_volume(1)
+            pg.mixer.music.set_volume(1)
             pg.mixer.music.play(-1)
 
     if not args.offline: moveplexer.shutdown()
