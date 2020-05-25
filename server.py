@@ -26,7 +26,6 @@ def main():
     clients = {}
 
     to_read = [lsock]
-
     while True:
         ready_to_read, ready_to_write, in_error = \
             select.select(to_read, [], [])
@@ -36,6 +35,7 @@ def main():
                 csock, addr = sock.accept()
                 clients[csock] = 0
                 to_read.append(csock)
+                print("Server: Client connected")
                 continue
 
             req = sock.recv(REQ_LEN)
@@ -51,8 +51,11 @@ def main():
                 clients[sock] = cpos
             elif req == MOVE_REQ:
                 moves.append(sock.recv(MOVE_LEN))
+            elif req == bytes():
+                print("Server: Client disconnected")
+                to_read.remove(sock)
             else:
-                print("Error: unknown request type " + req.decode())
+                print("Error: unknown request type " + str(req))
 
 
 
