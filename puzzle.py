@@ -39,6 +39,7 @@ class Piece():
         self.row, self.col = row, col
         self.x_ext, self.y_ext = x_ext, y_ext
         self.x, self.y = 0, 0
+        self.disp_x, self.disp_y = 0, 0
         self.group = set([self])
         self.locked = False
         self.adj = None
@@ -52,16 +53,19 @@ class Piece():
     def sx(self):
         if self.ptype in (self.TRC, self.BRC, self.BEE,
                           self.TEE, self.ROE, self.MID):
-            return self.x - self.x_ext
+            return self.disp_x - self.x_ext
         else:
-            return self.x
+            return self.disp_x
 
 
     def sy(self):
         if self.ptype in (self.BOE, self.REE, self.LEE, self.MDR):
-            return self.y - self.y_ext
+            return self.disp_y - self.y_ext
         else:
-            return self.y
+            return self.disp_y
+        
+    def place(self):
+        self.disp_x, self.disp_y = self.x, self.y
 
 
 class Puzzle():
@@ -199,14 +203,15 @@ class Puzzle():
                                             random.randrange(int(self.origin_y + img_h + piece.y - piece.sy()),
                                                              int(self.h - img_h / 2))])
                     piece.x = random.randrange(int(img_w / 2), int(self.w - img_w / 2))
+                piece.place()
 
     
     def click_check(self, x, y):
         for i in range(len(self.pieces) - 1, -1, -1):
             p = self.pieces[i]
             if (not p.locked and
-                p.x < x < p.x + self.piece_w and
-                p.y < y < p.y + self.piece_h):
+                p.disp_x < x < p.disp_x + self.piece_w and
+                p.disp_y < y < p.disp_y + self.piece_h):
                 self.pieces.pop(i)
                 self.pieces.append(p)
                 return p
@@ -222,8 +227,8 @@ class Puzzle():
             if dx == 0 and dy == 0:
                 break
         for p in piece.group:
-            p.x += dx
-            p.y += dy
+            p.disp_x += dx
+            p.disp_y += dy
             self.pieces.remove(p)
             self.pieces.append(p)
 
@@ -234,6 +239,7 @@ class Puzzle():
         for p in piece.group:
             p.x += dx
             p.y += dy
+            p.place()
             self.pieces.remove(p)
             self.pieces.append(p)
             
@@ -279,11 +285,12 @@ class Puzzle():
 
     
     def connection_check(self, piece):
+        if piece.locked: return
         def check_single(other, tx, ty):
             dx, dy = tx - piece.x, ty - piece.y
             if (abs(dx) < self.connect_tol and
                 abs(dy) < self.connect_tol):
-                self.move_piece(piece, dx, dy)
+                self.place_piece(piece, tx, ty)
                 new_group = piece.group.union(other.group)
                 for p in new_group:
                     p.group = new_group
@@ -306,10 +313,10 @@ class Puzzle():
         if n != None and n not in piece.group:
             check_single(n, n.x - self.piece_w, n.y)
         
-        def check_corner(tx, ty):
-            if (abs(tx) < self.connect_tol and
-                abs(ty) < self.connect_tol):
-                self.move_piece(piece, tx, ty)
+        def check_corner(dx, dy):
+            if (abs(dx) < self.connect_tol and
+                abs(dy) < self.connect_tol):
+                self.place_piece(piece, piece.x + dx, piece.y + dy)
                 for p in piece.group:
                     p.locked = True
 

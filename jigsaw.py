@@ -15,17 +15,12 @@ from puzzle import *
 server_process = None
 
 
-class Move():
-    def __init__(self, piece):
-        self.rc = (piece.row, piece.col)
-        self.x, self.y = piece.x, piece.y
-
-
 class Moveplexer():
     def __init__(self, sock):
         self.sock = sock
         self.incoming_moves = multiprocessing.Queue()
         self.outgoing_moves = multiprocessing.Queue()
+        self.running = True
         self.proc = multiprocessing.Process(target=self.run)
         self.proc.start()
     
@@ -35,25 +30,39 @@ class Moveplexer():
 
 
     def get_move(self):
-        if self.outgoing_moves.empty():
+        if self.incoming_moves.empty():
             return None
         else:
-            return self.outgoing_moves.get()
+            return self.incoming_moves.get()
 
         
     def update(self, puzzle):
         move = self.get_move()
         while move != None:
-            p = puzzle.matrix[move.rc]
+            p = puzzle.matrix[(move.r, move.c)]
             puzzle.place_piece(p, move.x, move.y)
             puzzle.connection_check(p)
             move = self.get_move()
 
 
     def run(self):
-        return
-    #     while True:
-    #         while not self.outgoing_moves
+        update_time = time.time()
+        update_interval = 0.1
+        while self.running:
+            while not self.outgoing_moves.empty():
+                self.sock.sendall(MOVE_REQ)
+                self.sock.sendall(self.outgoing_moves.get().pack())
+            t = time.time()
+            if t >= update_time:
+                udpate_time = t + update_interval
+                self.sock.sendall(UPDATE_REQ)
+                new_move_count = unpack_update_res(self.sock.recv(UPDATE_RES_LEN))[0]
+                for _ in range(new_move_count):
+                    self.incoming_moves.put(Move().unpack(self.sock.recv(MOVE_LEN)))
+                
+            
+    def shutdown(self):
+        self.running = False
         
 
 def main():
@@ -80,10 +89,9 @@ Do a jigsaw puzzle. Puzzle dimensions must be odd. The port (default=7777) must 
                         nargs=3, metavar=('IMAGE', 'WIDTH', 'HEIGHT'), default=False)
     parser.add_argument('-p', '--port', help="Port to connect to or host from",
                         default="7777")
-    parser.add_argument('-d', '--downscale', help="Locally downscale the resolution of the puzzle's largest dimension",
+    parser.add_argument('-d', '--downscale', help="Locally downscale the resolution of the puzzle's largest dimension. Not currently compatible with online.",
                         metavar='RESOLUTION', type=int, default=-1)
     args = parser.parse_args()
-    print(args)
 
     if args.offline:
         img_path, W, H = args.offline;
@@ -97,7 +105,6 @@ Do a jigsaw puzzle. Puzzle dimensions must be odd. The port (default=7777) must 
             global server_process
             server_process = subprocess.Popen(["python3", "server.py", args.port, img_path, W, H])
             args.connect = socket.gethostname()
-            print(args.connect)
         else:
             print("Connecting to server...")
 
@@ -114,11 +121,12 @@ Do a jigsaw puzzle. Puzzle dimensions must be odd. The port (default=7777) must 
                 pass
         print("Done.")
 
-        # if not args.server:
-        print("Downloading image...")
-        img_size, W, H = unpack_init_msg(sock.recv(INIT_MSG_LEN))
-        img_str = sock.recv(img_size).decode()
-        print("Done")
+        if not args.server:
+            print("Downloading image...")
+            sock.sendall(INIT_REQ)
+            img_size, W, H = unpack_init_res(sock.recv(INIT_RES_LEN))
+            img_str = sock.recv(img_size).decode()
+            print("Done")
 
         moveplexer = Moveplexer(sock)
     else:
@@ -135,8 +143,6 @@ Do a jigsaw puzzle. Puzzle dimensions must be odd. The port (default=7777) must 
     print("Building puzzle...")
     puzzle = Puzzle(img_str, int(W), int(H), downscale=args.downscale)
     print("Done.")
-
-    if not args.offline: moveplexer.update(puzzle)
 
     sw, sh = 1500, 1000
     screen = pg.display.set_mode([sw, sh], flags=display_flags)
@@ -159,9 +165,9 @@ Do a jigsaw puzzle. Puzzle dimensions must be odd. The port (default=7777) must 
             if event.type == pg.QUIT:
                 running = False
             elif event.type == pg.KEYDOWN:
-                if event.key == pg.K_ESCAPE:
-                    running = False
-                elif event.key == pg.K_SPACE:
+                # if event.key == pg.K_ESCAPE:
+                #     running = False
+                if event.key == pg.K_SPACE:
                     pan_x = pw / 2 - sw / scale / 2
                     pan_y = ph / 2 - sh / scale / 2
             elif event.type == pg.VIDEORESIZE:
@@ -184,10 +190,12 @@ Do a jigsaw puzzle. Puzzle dimensions must be odd. The port (default=7777) must 
             elif event.type == pg.MOUSEBUTTONUP:
                 if event.button == 1:
                     if holding != None:
-                        if not args.offline:
+                        if args.offline:
+                            for p in holding.group:
+                                puzzle.place_piece(p, p.disp_x, p.disp_y)
+                                puzzle.connection_check(p)
+                        else:
                             moveplexer.send_move(holding)
-                        for p in holding.group:
-                            puzzle.connection_check(p)
                         holding = None
                 elif event.button == 3:
                     panning = False
@@ -232,6 +240,7 @@ Do a jigsaw puzzle. Puzzle dimensions must be odd. The port (default=7777) must 
             pg.mixer.music.Sound.set_volume(1)
             pg.mixer.music.play(-1)
 
+    if not args.offline: moveplexer.shutdown()
     pg.quit()
 
 

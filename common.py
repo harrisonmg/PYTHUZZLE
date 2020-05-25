@@ -1,20 +1,59 @@
 from io import StringIO
 import struct
 
+
 BG_COLOR = (44, 47, 51)
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 
-INIT_MSG_LEN = len(struct.pack(">lll", 1, 2, 3))
+REQ_LEN = len("a".encode())
 
-def pack_init_msg(img_size, w, h):
-    return struct.pack(">lll", img_size, w, h)
+INIT_REQ = "i".encode()
+INIT_FMT = ">lll"
+INIT_RES_LEN = len(struct.pack(INIT_FMT, 1, 2, 3))
 
-def unpack_init_msg(msg):
-    return struct.unpack(">lll", msg)
+UPDATE_REQ = "u".encode()
+UPDATE_FMT = ">l"
+UPDATE_RES_LEN = len(struct.pack(UPDATE_FMT, 1))
+
+MOVE_REQ = "m".encode()
+MOVE_LEN = len(struct.pack(">llll", 1, 2, 3, 4))
+
+
+def pack_init_res(img_size, w, h):
+    return struct.pack(INIT_FMT, img_size, w, h)
+
+
+def unpack_init_res(msg):
+    return struct.unpack(INIT_FMT, msg)
+
 
 def get_img_str(img_path):
     img_io = StringIO(img_path)
     img_str = img_io.getvalue()
     img_io.close()
     return img_str
+
+
+def pack_update_res(move_count):
+    return struct.pack(UPDATE_FMT, move_count)
+
+
+def unpack_update_res(msg):
+    return struct.unpack(UPDATE_FMT, msg)
+
+
+class Move():
+    def __init__(self, piece=None):
+        if piece != None:
+            self.r, self.c = int(piece.row), int(piece.col)
+            self.x, self.y = int(piece.disp_x), int(piece.disp_y)
+
+
+    def pack(self):
+        return struct.pack(">llll", self.r, self.c, self.x, self.y)
+
+
+    def unpack(self, string):
+        self.r, self.c, self.x, self.y = struct.unpack(">llll", string)
+        return self
