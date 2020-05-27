@@ -1,3 +1,4 @@
+from PIL import Image
 import select
 import socket
 import sys
@@ -12,13 +13,14 @@ def main():
     W = int(sys.argv[3])
     H = int(sys.argv[4])
 
-    img_str = get_img_str(img_path).encode()
-    puzzle = Puzzle(img_str, int(W), int(H))
+    img = Image.open(img_path)
+    puzzle = Puzzle(img, int(W), int(H))
     moves = []
     for p in puzzle.pieces:
         moves.append(Move(p).pack())
 
-    init_res = pack_init_res(len(img_str), W, H)
+    img_bytes = pickle.dumps(img)
+    init_res = pack_init_res(len(img_bytes), W, H)
 
     lsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     lsock.bind(("0.0.0.0", port))
@@ -41,7 +43,7 @@ def main():
             req = sock.recv(REQ_LEN)
             if req == INIT_REQ:
                 sock.sendall(init_res)
-                sock.sendall(img_str)
+                sock.sendall(img_bytes)
             elif req == UPDATE_REQ:
                 cpos = clients[sock]
                 sock.sendall(pack_update_res(len(moves) - cpos))

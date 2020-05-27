@@ -96,12 +96,12 @@ Do a jigsaw puzzle. Puzzle dimensions must be odd. The port (default=7777) must 
 
     if args.offline:
         img_path, W, H = args.offline;
-        img_str = get_img_str(img_path)
+        img = Image.open(img_path)
         pass
     elif args.server or args.connect:
         if args.server:
             img_path, W, H = args.server;
-            img_str = get_img_str(img_path)
+            img = Image.open(img_path)
             print("Starting server...")
             global server_process
 
@@ -131,7 +131,7 @@ Do a jigsaw puzzle. Puzzle dimensions must be odd. The port (default=7777) must 
             print("Downloading image...")
             sock.sendall(INIT_REQ)
             img_size, W, H = unpack_init_res(sock.recv(INIT_RES_LEN))
-            img_str = sock.recv(img_size).decode()
+            img = pickle.loads(sock.recv(img_size, socket.MSG_WAITALL))
             print("Done")
 
         moveplexer = Moveplexer(sock)
@@ -147,7 +147,7 @@ Do a jigsaw puzzle. Puzzle dimensions must be odd. The port (default=7777) must 
 
     display_flags = pg.RESIZABLE
     print("Building puzzle...")
-    puzzle = Puzzle(img_str, int(W), int(H), downscale=args.downscale)
+    puzzle = Puzzle(img, int(W), int(H), downscale=args.downscale)
     print("Done.")
 
     sw, sh = 1500, 1000
@@ -211,10 +211,8 @@ Do a jigsaw puzzle. Puzzle dimensions must be odd. The port (default=7777) must 
                 if panning:
                     pan_x -= mx
                     pan_y -= my
-                if holding != None:
+                elif holding != None:
                     puzzle.move_piece(holding, mx, my)
-
-        pan_x
 
         ss_width = min(max(1, sw / scale), pw)
         ss_height = min(max(1, sh / scale), ph)

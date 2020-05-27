@@ -1,4 +1,3 @@
-from io import StringIO
 import os
 from PIL import Image
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
@@ -70,9 +69,8 @@ class Piece():
 
 
 class Puzzle():
-    def __init__(self, img_str, W, H, downscale=-1, margin=2):
+    def __init__(self, img, W, H, downscale=-1, margin=2):
         if W % 2 == 0 or H % 2 == 0: raise ValueError("Puzzle dimensions must be positive and odd")
-        img = Image.open(img_str)
         img_w, img_h = img.size
 
         if downscale > 0 and max(img.size) > downscale:

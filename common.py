@@ -1,4 +1,5 @@
-from io import StringIO
+import pickle
+from PIL import Image
 import struct
 
 
@@ -26,13 +27,6 @@ def pack_init_res(img_size, w, h):
 
 def unpack_init_res(msg):
     return struct.unpack(INIT_FMT, msg)
-
-
-def get_img_str(img_path):
-    img_io = StringIO(img_path)
-    img_str = img_io.getvalue()
-    img_io.close()
-    return img_str
 
 
 def pack_update_res(move_count):
