@@ -29,35 +29,39 @@ def main():
 
     to_read = [lsock]
     while True:
-        ready_to_read, ready_to_write, in_error = \
-            select.select(to_read, [], [])
+        try:
+            ready_to_read, ready_to_write, in_error = \
+                select.select(to_read, [], [])
 
-        for sock in ready_to_read:
-            if sock == lsock:
-                csock, addr = sock.accept()
-                clients[csock] = 0
-                to_read.append(csock)
-                print("Server: Client connected")
-                continue
+            for sock in ready_to_read:
+                if sock == lsock:
+                    csock, addr = sock.accept()
+                    clients[csock] = 0
+                    to_read.append(csock)
+                    print("Server: Client connected")
+                    continue
 
-            req = sock.recv(REQ_LEN)
-            if req == INIT_REQ:
-                sock.sendall(init_res)
-                sock.sendall(img_bytes)
-            elif req == UPDATE_REQ:
-                cpos = clients[sock]
-                sock.sendall(pack_update_res(len(moves) - cpos))
-                while cpos < len(moves):
-                    sock.sendall(moves[cpos])
-                    cpos += 1
-                clients[sock] = cpos
-            elif req == MOVE_REQ:
-                moves.append(sock.recv(MOVE_LEN))
-            elif req == bytes():
-                print("Server: Client disconnected")
-                to_read.remove(sock)
-            else:
-                print("Error: unknown request type " + str(req))
+                req = sock.recv(REQ_LEN)
+                if req == INIT_REQ:
+                    sock.sendall(init_res)
+                    sock.sendall(img_bytes)
+                elif req == UPDATE_REQ:
+                    cpos = clients[sock]
+                    sock.sendall(pack_update_res(len(moves) - cpos))
+                    while cpos < len(moves):
+                        sock.sendall(moves[cpos])
+                        cpos += 1
+                    clients[sock] = cpos
+                elif req == MOVE_REQ:
+                    moves.append(sock.recv(MOVE_LEN))
+                elif req == bytes():
+                    print("Server: Client disconnected")
+                    to_read.remove(sock)
+                else:
+                    print("Error: unknown request type " + str(req))
+        except socket.error as exc:
+            print("Socket error: " + str(exc))
+                    
 
 
 if __name__ == "__main__":
