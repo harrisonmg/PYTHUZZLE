@@ -47,6 +47,7 @@ class Moveplexer():
             puzzle.place_piece(p, move.x, move.y)
             puzzle.connection_check(p)
             move = self.get_move()
+        return holding
 
 
     def run(self):
