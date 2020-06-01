@@ -218,6 +218,7 @@ class Puzzle():
 
     
     def move_piece(self, piece, dx, dy):
+        if piece.locked: return
         for p in piece.group:
             if (p.sx() + dx < 0 or p.sx() + dx + p.w > self.w):
                 dx = 0
@@ -233,6 +234,7 @@ class Puzzle():
 
 
     def place_piece(self, piece, x, y):
+        if piece.locked: return
         dx = x - piece.x
         dy = y - piece.y
         for p in piece.group:
