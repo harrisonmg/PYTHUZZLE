@@ -37,10 +37,11 @@ class Moveplexer():
             return self.incoming_moves.get()
 
         
-    def update(self, puzzle):
+    def update(self, puzzle, holding):
         move = self.get_move()
         while move != None:
             p = puzzle.matrix[(move.r, move.c)]
+            if holding == p: holding = None
             puzzle.place_piece(p, move.x, move.y)
             puzzle.connection_check(p)
             move = self.get_move()
@@ -156,6 +157,7 @@ Do a jigsaw puzzle. Puzzle dimensions must be odd. The port (default=7777) must 
     pw, ph = puzzle.w, puzzle.h
     scale = min(sw / pw, sh / ph)
     scale_factor = 10 / 9
+    max_scale = 15000 / (2 * max(puzzle.piece_w, puzzle.piece_h))
 
     panning = False
     pan_x = pw / 2 - sw / scale / 2
@@ -165,7 +167,8 @@ Do a jigsaw puzzle. Puzzle dimensions must be odd. The port (default=7777) must 
 
     running = True
     while running:
-        if not args.offline: moveplexer.update(puzzle)
+        if not args.offline:
+            holding = moveplexer.update(puzzle, holding)
 
         for event in pg.event.get():
             if event.type == pg.QUIT:
@@ -189,6 +192,7 @@ Do a jigsaw puzzle. Puzzle dimensions must be odd. The port (default=7777) must 
                     pan_y += sh / scale / 2
                     if event.button == 4:
                         scale *= scale_factor
+                        scale = min(scale, max_scale)
                     else:
                         scale /= scale_factor
                     pan_x -= sw / scale / 2
@@ -197,9 +201,8 @@ Do a jigsaw puzzle. Puzzle dimensions must be odd. The port (default=7777) must 
                 if event.button == 1:
                     if holding != None:
                         if args.offline:
-                            for p in holding.group:
-                                puzzle.place_piece(p, p.disp_x, p.disp_y)
-                                puzzle.connection_check(p)
+                            puzzle.place_piece(holding, holding.disp_x, holding.disp_y)
+                            puzzle.connection_check(holding)
                         else:
                             moveplexer.send_move(holding)
                         holding = None

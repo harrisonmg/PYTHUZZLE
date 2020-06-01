@@ -257,6 +257,13 @@ class Puzzle():
             pg.draw.rect(frame, BLACK, (int(rx * scale), int(ry * scale), int(rw * scale), int(rh * scale)))
 
         for p in self.pieces:
+            if not p.locked: continue
+            if rect_overlap((ss_x, ss_y, ss_width, ss_height), (p.sx(), p.sy(), p.w, p.h)):
+                frame.blit(pg.transform.scale(p.sprite, (int(p.w * scale), int(p.h * scale))),
+                        (int((p.sx() - ss_x) * scale), int((p.sy() - ss_y) * scale)))
+
+        for p in self.pieces:
+            if p.locked: continue
             if rect_overlap((ss_x, ss_y, ss_width, ss_height), (p.sx(), p.sy(), p.w, p.h)):
                 frame.blit(pg.transform.scale(p.sprite, (int(p.w * scale), int(p.h * scale))),
                         (int((p.sx() - ss_x) * scale), int((p.sy() - ss_y) * scale)))
@@ -282,8 +289,11 @@ class Puzzle():
             piece.sprite = piece.crop.convert()
             piece.low = True
 
-    
     def connection_check(self, piece):
+        for p in piece.group:
+            self.single_connection_check(p)
+
+    def single_connection_check(self, piece):
         if piece.locked: return
         def check_single(other, tx, ty):
             dx, dy = tx - piece.x, ty - piece.y
