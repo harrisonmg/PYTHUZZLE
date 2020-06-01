@@ -61,7 +61,6 @@ def main():
                     print("Error: unknown request type " + str(req))
         except socket.error as exc:
             print("Socket error: " + str(exc))
-                    
 
 
 if __name__ == "__main__":

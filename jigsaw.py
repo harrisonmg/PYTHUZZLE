@@ -8,12 +8,14 @@ import socket
 import subprocess
 import sys
 import time
+import uuid
 
 from common import *
 from puzzle import Puzzle
 
 
 server_process = None
+viewer_process = None
 
 
 class Moveplexer():
@@ -29,7 +31,7 @@ class Moveplexer():
     def send_move(self, piece):
         self.outgoing_moves.put(Move(piece))
 
-
+        
     def get_move(self):
         if self.incoming_moves.empty():
             return None
@@ -65,7 +67,20 @@ class Moveplexer():
             
     def shutdown(self):
         self.running = False
+
         
+def open_image_viewer(img):
+    try:
+        os.mkdir("image_cache")
+    except FileExistsError:
+        pass
+    filename = "image_cache/" + str(uuid.uuid4()) + ".png"
+    img.save(filename)
+    image_viewer = {'linux': 'xdg-open', 'win32': 'start', 'darwin': 'open'}[sys.platform]
+    shell = sys.platform == 'win32'
+    with open(os.devnull, 'wb') as shutup:
+        subprocess.run([image_viewer, filename], stdout=shutup, stderr=shutup, shell=shell)
+
 
 def main():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter, description="""
@@ -150,6 +165,8 @@ Do a jigsaw puzzle. Puzzle dimensions must be odd. The port (default=7777) must 
     print("Building puzzle...")
     puzzle = Puzzle(img, int(W), int(H), downscale=args.downscale)
     print("Done.")
+
+    open_image_viewer(puzzle.img)
 
     sw, sh = 1500, 1000
     screen = pg.display.set_mode([sw, sh], flags=display_flags)
@@ -259,3 +276,5 @@ if __name__ == "__main__":
     finally:
         if server_process != None:
             server_process.kill()
+        if viewer_process != None:
+            viewer_process.kill()

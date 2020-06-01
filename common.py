@@ -18,6 +18,7 @@ UPDATE_FMT = ">l"
 UPDATE_RES_LEN = len(struct.pack(UPDATE_FMT, 1))
 
 MOVE_REQ = "m".encode()
+MOVE_REQ_HOLD = "m".encode()
 MOVE_LEN = len(struct.pack(">llll", 1, 2, 3, 4))
 
 
