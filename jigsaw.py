@@ -87,6 +87,10 @@ def main():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter, description="""
 Do a jigsaw puzzle. Puzzle dimensions must be odd. The port (default=7777) must be forwarded to host an online game.
 
+    Install dependencies:
+    
+        python3 -m pip install -r requirements.txt
+
     Start a 3x3 offline game:
 
         python3 jigsaw.py -o rock.png 3 3
