@@ -115,6 +115,8 @@ Do a jigsaw puzzle. Puzzle dimensions must be odd. The port (default=7777) must 
                         metavar='RESOLUTION', type=int, default=-1)
     parser.add_argument('-n', '--no-viewer', help="Don't open an accompanying image viewer",
                         action='store_true', default=False)
+    parser.add_argument('-e', '--escape-exit', help="Let the escape key exit the program.",
+                        action='store_true', default=False)
     args = parser.parse_args()
 
     if args.offline:
@@ -199,8 +201,8 @@ Do a jigsaw puzzle. Puzzle dimensions must be odd. The port (default=7777) must 
             if event.type == pg.QUIT:
                 running = False
             elif event.type == pg.KEYDOWN:
-                # if event.key == pg.K_ESCAPE:
-                #     running = False
+                if event.key == pg.K_ESCAPE and args.escape_exit:
+                    running = False
                 if event.key == pg.K_SPACE:
                     pan_x = pw / 2 - sw / scale / 2
                     pan_y = ph / 2 - sh / scale / 2
