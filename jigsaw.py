@@ -109,6 +109,8 @@ Do a jigsaw puzzle. Puzzle dimensions must be odd. The port (default=7777) must 
                         default="7777")
     parser.add_argument('-d', '--downscale', help="Locally downscale the resolution of the puzzle's largest dimension. Not currently compatible with online.",
                         metavar='RESOLUTION', type=int, default=-1)
+    parser.add_argument('-n', '--no-viewer', help="Don't open an accompanying image viewer",
+                        action='store_true', default=False)
     args = parser.parse_args()
 
     if args.offline:
@@ -167,7 +169,8 @@ Do a jigsaw puzzle. Puzzle dimensions must be odd. The port (default=7777) must 
     puzzle = Puzzle(img, int(W), int(H), downscale=args.downscale)
     print("Done.")
 
-    open_image_viewer(puzzle.img)
+    if not args.no_viewer:
+        open_image_viewer(puzzle.img)
 
     sw, sh = 1500, 1000
     screen = pg.display.set_mode([sw, sh], flags=display_flags)
