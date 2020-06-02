@@ -301,11 +301,15 @@ class Puzzle():
             dx, dy = tx - piece.x, ty - piece.y
             if (abs(dx) < self.connect_tol and
                 abs(dy) < self.connect_tol):
-                self.place_piece(piece, tx, ty)
+                if piece.locked:
+                    self.place_piece(other, other.x - dx, other.y - dy)
+                else:
+                    self.place_piece(piece, tx, ty)
                 new_group = piece.group.union(other.group)
+                locked = piece.locked or other.locked
                 for p in new_group:
                     p.group = new_group
-                    p.locked = other.locked
+                    p.locked = locked
                     self.landlock_check(p)
 
         n = self.matrix.get((piece.row - 1, piece.col), None)
