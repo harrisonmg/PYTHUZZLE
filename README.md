@@ -2,6 +2,14 @@
 
 An online multiplayer jigsaw puzzle.
 
+## Controls
+| Key          | Action        |
+|--------------|---------------|
+| Left Click   | Move Piece    |
+| Right Click  | Pan           |
+| Scroll Wheel | Zoom          |
+| Space        | Center Puzzle |
+
 ```
 usage: jigsaw.py [-h] [-o IMAGE WIDTH HEIGHT] [-c SERVER_IP]
                  [-s IMAGE WIDTH HEIGHT] [-p PORT] [-d RESOLUTION] [-n] [-e]
