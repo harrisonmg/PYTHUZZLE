@@ -10,6 +10,7 @@ An online multiplayer jigsaw puzzle.
 | Scroll Wheel | Zoom          |
 | Space        | Center Puzzle |
 
+## Usage
 ```
 usage: jigsaw.py [-h] [-o IMAGE WIDTH HEIGHT] [-c SERVER_IP]
                  [-s IMAGE WIDTH HEIGHT] [-p PORT] [-d RESOLUTION] [-n] [-e]
