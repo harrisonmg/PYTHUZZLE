@@ -43,9 +43,9 @@ class Moveplexer():
         move = self.get_move()
         while move != None:
             p = puzzle.matrix[(move.r, move.c)]
-            if holding == p: holding = None
             puzzle.place_piece(p, move.x, move.y)
             puzzle.connection_check(p)
+            if holding in p.group: holding = None
             move = self.get_move()
         return holding
 
@@ -143,8 +143,8 @@ Do a jigsaw puzzle. Puzzle dimensions must be odd. The port (default=7777) must 
         start_time = time.time()
         while True:
             if time.time() - start_time > 10:
-                print("Error: Could not connect to server")
-                sys.exit()
+                print("Error: Could not connect to server. Retrying...")
+                start_time = time.time()
             try:
                 sock.connect((args.connect, int(args.port)))
                 break
