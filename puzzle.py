@@ -43,7 +43,6 @@ class Piece():
         self.group = set([self])
         self.locked = False
         self.adj = None
-        self.low = False
 
 
     def spos(self):
@@ -109,30 +108,36 @@ class Puzzle():
                 if (r == 0 and c == 0):
                     # top left corner
                     ptype = Piece.TLC
+                    base = Image.open("corner.png")
                     mask = Image.open("corner_blur.png")
                     crop = img.crop((0, 0, piece_w + x_ext, piece_h))
                 elif (r == 0 and c == W - 1):
                     # top right corner
                     ptype = Piece.TRC
+                    base = Image.open("corner.png").transpose(Image.FLIP_LEFT_RIGHT)
                     mask = Image.open("corner_blur.png").transpose(Image.FLIP_LEFT_RIGHT)
                     crop = img.crop((img_w - piece_w - x_ext, 0, img_w, piece_h))
                 elif (r == H - 1 and c == 0):
                     # bottom left corner
                     ptype = Piece.BLC
+                    base = Image.open("corner.png").transpose(Image.FLIP_TOP_BOTTOM)
                     mask = Image.open("corner_blur.png").transpose(Image.FLIP_TOP_BOTTOM)
                     crop = img.crop((0, img_h - piece_h, piece_w + x_ext, img_h))
                 elif (r == H - 1 and c == W - 1):
                     # bottom right corner
                     ptype = Piece.BRC
+                    base = Image.open("corner.png").transpose(Image.FLIP_LEFT_RIGHT).transpose(Image.FLIP_TOP_BOTTOM)
                     mask = Image.open("corner_blur.png").transpose(Image.FLIP_LEFT_RIGHT).transpose(Image.FLIP_TOP_BOTTOM)
                     crop = img.crop((img_w - piece_w - x_ext, img_h - piece_h, img_w, img_h))
                 elif (r == 0 or r == H - 1):
                     # horizontal edge
                     if (c % 2 == 0):
+                        base = Image.open("even_edge.png")
                         mask = Image.open("even_edge_blur.png")
                         if (r == H - 1):
                             # bottom edge
                             ptype = Piece.BEE
+                            base = base.transpose(Image.FLIP_TOP_BOTTOM)
                             mask = mask.transpose(Image.FLIP_TOP_BOTTOM)
                             crop = img.crop((c * piece_w - x_ext, img_h - piece_h, (c + 1) * piece_w + x_ext, img_h))
                         else:
@@ -140,10 +145,12 @@ class Puzzle():
                             ptype = Piece.TEE
                             crop = img.crop((c * piece_w - x_ext, 0, (c + 1) * piece_w + x_ext, piece_h))
                     else:
+                        base = Image.open("odd_edge.png")
                         mask = Image.open("odd_edge_blur.png")
                         if (r == H - 1):
                             # bottom edge
                             ptype = Piece.BOE
+                            base = base.transpose(Image.FLIP_TOP_BOTTOM)
                             mask = mask.transpose(Image.FLIP_TOP_BOTTOM)
                             crop = img.crop((c * piece_w, img_h - piece_h - y_ext, (c + 1) * piece_w, img_h))
                         else:
@@ -153,42 +160,51 @@ class Puzzle():
                 elif (c == 0 or c == W - 1):
                     # vertical edge (switch odd and even edges)
                     if (r % 2 == 0):
+                        base = Image.open("odd_edge.png")
                         mask = Image.open("odd_edge_blur.png")
                         if (c == W - 1):
                             # right edge
                             ptype = Piece.ROE
+                            base = base.transpose(Image.ROTATE_270)
                             mask = mask.transpose(Image.ROTATE_270)
                             crop = img.crop((img_w - piece_w - x_ext, r * piece_h, img_w, (r + 1) * piece_h))
                         else:
                             # left edge
                             ptype = Piece.LOE
+                            base = base.transpose(Image.ROTATE_90)
                             mask = mask.transpose(Image.ROTATE_90)
                             crop = img.crop((0, r * piece_h, piece_w + x_ext, (r + 1) * piece_h))
                     else:
+                        base = Image.open("even_edge.png")
                         mask = Image.open("even_edge_blur.png")
                         if (c == W - 1):
                             # right edge
                             ptype = Piece.REE
+                            base = base.transpose(Image.ROTATE_270)
                             mask = mask.transpose(Image.ROTATE_270)
                             crop = img.crop((img_w - piece_w, r * piece_h - y_ext, img_w, (r + 1) * piece_h + y_ext))
                         else:
                             # left edge
                             ptype = Piece.LEE
+                            base = base.transpose(Image.ROTATE_90)
                             mask = mask.transpose(Image.ROTATE_90)
                             crop = img.crop((0, r * piece_h - y_ext, piece_w, (r + 1) * piece_h + y_ext))
                 elif (r % 2 == c % 2):
                     ptype = Piece.MID
+                    base = Image.open("middle.png")
                     mask = Image.open("middle_blur.png")
                     crop = img.crop((c * piece_w - x_ext, r * piece_h,
                                     (c + 1) * piece_w + x_ext, (r + 1) * piece_h))
                 else:
                     ptype = Piece.MDR
+                    base = Image.open("middle.png").transpose(Image.ROTATE_90)
                     mask = Image.open("middle_blur.png").transpose(Image.ROTATE_90)
                     crop = img.crop((c * piece_w, r * piece_h - y_ext,
                                     (c + 1) * piece_w, (r + 1) * piece_h + y_ext))
 
+                base = base.resize(crop.size)
                 mask = mask.resize(crop.size)
-                piece = Piece(Image.composite(crop, mask, mask), crop, ptype, r, c, x_ext, y_ext)
+                piece = Piece(Image.composite(crop, base, mask), crop, ptype, r, c, x_ext, y_ext)
                 self.pieces.append(piece)
                 self.matrix[(r, c)] = piece
 
@@ -289,7 +305,6 @@ class Puzzle():
                     piece.adj.add(n)
         if piece.adj.issubset(piece.group):
             piece.sprite = piece.crop.convert()
-            piece.low = True
 
     def connection_check(self, piece):
         for p in piece.group:
