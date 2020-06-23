@@ -124,6 +124,7 @@ Do a jigsaw puzzle. Puzzle dimensions must be odd. The port (default=7777) must 
         img = Image.open(img_path)
         pass
     elif args.server or args.connect:
+        args.downscale = -1
         if args.server:
             img_path, W, H = args.server;
             img = Image.open(img_path)

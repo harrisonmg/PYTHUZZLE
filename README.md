@@ -1,4 +1,4 @@
-# JigsawUrFriends
+# Friendly Jigsaw
 
 An online multiplayer jigsaw puzzle.
 
