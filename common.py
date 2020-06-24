@@ -25,7 +25,7 @@ IDX_REQ = "d".encode()
 IDX_FMT = ">I"
 IDX_LEN = len(struct.pack(IDX_FMT, 1))
 
-CURSOR_FMT = ">Iffiiff"
+CURSOR_FMT = ">Iddiidd"
 CURSOR_LEN = len(struct.pack(CURSOR_FMT, 0, 1, 2, 3, 4, 5, 6))
 
 

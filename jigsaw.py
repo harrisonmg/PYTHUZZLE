@@ -23,7 +23,8 @@ class Moveplexer():
         self.sock = sock
         self.incoming_moves = multiprocessing.Queue()
         self.outgoing_moves = multiprocessing.Queue()
-        self.cursors = multiprocessing.Queue()
+        self.manager = multiprocessing.Manager()
+        self.cursors = self.manager.dict()
         self.cursor = multiprocessing.Queue(1)
         self.cursor.put(Cursor(idx))
         self.cursor_lock = multiprocessing.Lock()
@@ -64,7 +65,7 @@ class Moveplexer():
             
         return holding
 
-
+        
     def run(self):
         update_time = time.time()
         update_interval = 0.1
@@ -83,11 +84,14 @@ class Moveplexer():
                 new_move_count, cursor_count = unpack_update_res(self.sock.recv(UPDATE_RES_LEN))
                 for _ in range(new_move_count):
                     self.incoming_moves.put(Move().unpack(self.sock.recv(MOVE_LEN)))
-                while not self.cursors.empty():
-                    self.cursors.get()
-                print(cursor_count)
+                updated = set()
                 for _ in range(cursor_count):
-                    self.cursors.put(Cursor().unpack(self.sock.recv(CURSOR_LEN)))
+                    c = Cursor().unpack(self.sock.recv(CURSOR_LEN))
+                    self.cursors[c.idx] = c
+                    updated.add(c.idx)
+                for i in self.cursors.keys():
+                    if i not in updated:
+                        self.cursors.pop(i)
                 
             
     def shutdown(self):
@@ -219,7 +223,10 @@ Do a jigsaw puzzle. Puzzle dimensions must be odd. The port (default=7777) must 
     pan_y = ph / 2 - sh / scale / 2
 
     holding = None
+    mouse_pos = (0, 0)
     cursor_pos = (0, 0)
+    cursor_img = pg.image.load('cursor.png')
+    cursor_img = pg.transform.scale(cursor_img, (int(cursor_img.get_width() / 2), int(cursor_img.get_height() / 2)))
 
     running = True
     while running:
@@ -265,7 +272,7 @@ Do a jigsaw puzzle. Puzzle dimensions must be odd. The port (default=7777) must 
                 elif event.button == 3:
                     panning = False
             elif event.type == pg.MOUSEMOTION:
-                cursor_pos = event.pos
+                mouse_pos = event.pos
                 mx = event.rel[0] / scale
                 my = event.rel[1] / scale
                 if panning:
@@ -299,7 +306,20 @@ Do a jigsaw puzzle. Puzzle dimensions must be odd. The port (default=7777) must 
 
         screen.fill(BG_COLOR)
         screen.blit(puzzle.subsurface(int(ss_x), int(ss_y), int(ss_width), int(ss_height), scale), (blit_x, blit_y))
+
+        for cursor in moveplexer.cursors.values():
+            if (pan_x < cursor.x < pan_x + sw / scale and
+                pan_y < cursor.y < pan_y + sh / scale):
+                screen.blit(cursor_img, ((cursor.x - pan_x) * scale, (cursor.y - pan_y) * scale))
+            if (cursor.pr != -1 and cursor.pc != -1):
+                p = puzzle.matrix[(cursor.pr, cursor.pc)]
+                if holding == p: holding = None
+                dx, dy = cursor.px - p.disp_x, cursor.py - p.disp_y
+                puzzle.move_piece(p, dx, dy)
+
         pg.display.flip()
+
+        cursor_pos = (mouse_pos[0] / scale + pan_x, mouse_pos[1] / scale + pan_y)
         
         if puzzle.complete() and pg.mixer.get_init() and not pg.mixer.music.get_busy():
             pg.mixer.music.load('congrats.wav')
