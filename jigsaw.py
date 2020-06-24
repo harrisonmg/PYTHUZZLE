@@ -189,7 +189,7 @@ Do a jigsaw puzzle. Puzzle dimensions must be odd. The port (default=7777) must 
             sock.sendall(INIT_REQ)
             img_size, W, H = unpack_init_res(sock.recv(INIT_RES_LEN))
             img = pickle.loads(sock.recv(img_size, socket.MSG_WAITALL))
-            print("Done")
+            print("Done.")
 
         moveplexer = Moveplexer(sock, idx)
     else:
@@ -310,7 +310,7 @@ Do a jigsaw puzzle. Puzzle dimensions must be odd. The port (default=7777) must 
         for cursor in moveplexer.cursors.values():
             if (pan_x < cursor.x < pan_x + sw / scale and
                 pan_y < cursor.y < pan_y + sh / scale):
-                screen.blit(cursor_img, ((cursor.x - pan_x) * scale, (cursor.y - pan_y) * scale))
+                screen.blit(cursor_img, (int((cursor.x - pan_x) * scale), int((cursor.y - pan_y) * scale)))
             if (cursor.pr != -1 and cursor.pc != -1):
                 p = puzzle.matrix[(cursor.pr, cursor.pc)]
                 if holding == p: holding = None
