@@ -26,11 +26,11 @@ class Moveplexer():
         self.manager = multiprocessing.Manager()
         self.cursors = self.manager.dict()
         self.cursor = multiprocessing.Queue(1)
-        self.cursor.put(Cursor(idx))
+        self.cursor.put(Cursor(idx).pack())
         self.cursor_lock = multiprocessing.Lock()
         self.running = True
-        self.proc = multiprocessing.Process(target=self.run)
-        self.proc.start()
+        # self.proc = multiprocessing.Process(target=self.run)
+        # self.proc.start()
     
 
     def send_move(self, piece):
@@ -54,44 +54,44 @@ class Moveplexer():
             move = self.get_move()
 
         with self.cursor_lock:
-            cursor = self.cursor.get()
+            cursor = Cursor().unpack(self.cursor.get())
             cursor.x, cursor.y = cursor_pos
             if holding == None:
                 cursor.pr, cursor.pc = -1, -1
             else:
                 cursor.pr, cursor.pc = holding.row, holding.col
                 cursor.px, cursor.py = holding.disp_x, holding.disp_y
-            self.cursor.put(cursor)
+            self.cursor.put(cursor.pack())
             
         return holding
 
         
     def run(self):
-        update_time = time.time()
-        update_interval = 0.1
-        while self.running:
-            while not self.outgoing_moves.empty():
-                self.sock.sendall(MOVE_REQ)
-                self.sock.sendall(self.outgoing_moves.get().pack())
-            t = time.time()
-            if t >= update_time:
-                update_time = t + update_interval
-                self.sock.sendall(UPDATE_REQ)
-                with self.cursor_lock:
-                    cursor = self.cursor.get()
-                    self.sock.sendall(cursor.pack())
-                    self.cursor.put(cursor)
-                new_move_count, cursor_count = unpack_update_res(self.sock.recv(UPDATE_RES_LEN))
-                for _ in range(new_move_count):
-                    self.incoming_moves.put(Move().unpack(self.sock.recv(MOVE_LEN)))
-                updated = set()
-                for _ in range(cursor_count):
-                    c = Cursor().unpack(self.sock.recv(CURSOR_LEN))
-                    self.cursors[c.idx] = c
-                    updated.add(c.idx)
-                for i in self.cursors.keys():
-                    if i not in updated:
-                        self.cursors.pop(i)
+        # update_time = time.time()
+        # update_interval = 0.1
+        # while self.running:
+        while not self.outgoing_moves.empty():
+            self.sock.sendall(MOVE_REQ)
+            self.sock.sendall(self.outgoing_moves.get().pack())
+        t = time.time()
+        if True:#t >= update_time:
+            # update_time = t + update_interval
+            self.sock.sendall(UPDATE_REQ)
+            with self.cursor_lock:
+                cursor = self.cursor.get()
+                self.sock.sendall(cursor)
+                self.cursor.put(cursor)
+            new_move_count, cursor_count = unpack_update_res(self.sock.recv(UPDATE_RES_LEN))
+            for _ in range(new_move_count):
+                self.incoming_moves.put(Move().unpack(self.sock.recv(MOVE_LEN)))
+            updated = set()
+            for _ in range(cursor_count):
+                c = Cursor().unpack(self.sock.recv(CURSOR_LEN))
+                self.cursors[c.idx] = c
+                updated.add(c.idx)
+            for i in self.cursors.keys():
+                if i not in updated:
+                    self.cursors.pop(i)
                 
             
     def shutdown(self):
@@ -231,6 +231,7 @@ Do a jigsaw puzzle. Puzzle dimensions must be odd. The port (default=7777) must 
     running = True
     while running:
         if not args.offline:
+            moveplexer.run()
             holding = moveplexer.update(puzzle, holding, cursor_pos)
 
         for event in pg.event.get():
