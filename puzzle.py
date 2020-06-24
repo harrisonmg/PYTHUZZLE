@@ -306,9 +306,11 @@ class Puzzle():
         if piece.adj.issubset(piece.group):
             piece.sprite = piece.crop.convert()
 
+
     def connection_check(self, piece):
         for p in piece.group:
             self.single_connection_check(p)
+
 
     def single_connection_check(self, piece):
         if piece.locked: return

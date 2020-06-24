@@ -26,6 +26,8 @@ def main():
     lsock.bind(("0.0.0.0", port))
     lsock.listen(32)
     clients = {}
+    indices = {}
+    cursors = {}
 
     to_read = [lsock]
     while True:
@@ -37,25 +39,36 @@ def main():
                 if sock == lsock:
                     csock, addr = sock.accept()
                     clients[csock] = 0
+                    idx = len(indices)
+                    indices[csock] = idx
+                    cursors[idx] = Cursor(idx).pack()
                     to_read.append(csock)
                     print("Server: Client connected")
                     continue
 
                 req = sock.recv(REQ_LEN)
-                if req == INIT_REQ:
+                if req == IDX_REQ:
+                    sock.sendall(pack_idx(indices[sock]))
+                elif req == INIT_REQ:
                     sock.sendall(init_res)
                     sock.sendall(img_bytes)
                 elif req == UPDATE_REQ:
+                    idx = indices[sock]
+                    cursors[indices[sock]] = sock.recv(CURSOR_LEN)
                     cpos = clients[sock]
-                    sock.sendall(pack_update_res(len(moves) - cpos))
+                    sock.sendall(pack_update_res(len(moves) - cpos, len(cursors) - 1))
                     while cpos < len(moves):
                         sock.sendall(moves[cpos])
                         cpos += 1
                     clients[sock] = cpos
+                    for i, c in cursors.items():
+                        if i != idx:
+                            sock.sendall(c)
                 elif req == MOVE_REQ:
                     moves.append(sock.recv(MOVE_LEN))
                 elif req == bytes():
                     print("Server: Client disconnected")
+                    cursors.pop(indices[sock])
                     to_read.remove(sock)
                 else:
                     print("Error: unknown request type " + str(req))

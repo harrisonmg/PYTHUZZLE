@@ -19,10 +19,14 @@ viewer_process = None
 
 
 class Moveplexer():
-    def __init__(self, sock):
+    def __init__(self, sock, idx):
         self.sock = sock
         self.incoming_moves = multiprocessing.Queue()
         self.outgoing_moves = multiprocessing.Queue()
+        self.cursors = multiprocessing.Queue()
+        self.cursor = multiprocessing.Queue(1)
+        self.cursor.put(Cursor(idx))
+        self.cursor_lock = multiprocessing.Lock()
         self.running = True
         self.proc = multiprocessing.Process(target=self.run)
         self.proc.start()
@@ -39,7 +43,7 @@ class Moveplexer():
             return self.incoming_moves.get()
 
         
-    def update(self, puzzle, holding):
+    def update(self, puzzle, holding, cursor_pos):
         move = self.get_move()
         while move != None:
             p = puzzle.matrix[(move.r, move.c)]
@@ -47,6 +51,17 @@ class Moveplexer():
             puzzle.connection_check(p)
             if holding in p.group: holding = None
             move = self.get_move()
+
+        with self.cursor_lock:
+            cursor = self.cursor.get()
+            cursor.x, cursor.y = cursor_pos
+            if holding == None:
+                cursor.pr, cursor.pc = -1, -1
+            else:
+                cursor.pr, cursor.pc = holding.row, holding.col
+                cursor.px, cursor.py = holding.disp_x, holding.disp_y
+            self.cursor.put(cursor)
+            
         return holding
 
 
@@ -59,11 +74,20 @@ class Moveplexer():
                 self.sock.sendall(self.outgoing_moves.get().pack())
             t = time.time()
             if t >= update_time:
-                udpate_time = t + update_interval
+                update_time = t + update_interval
                 self.sock.sendall(UPDATE_REQ)
-                new_move_count = unpack_update_res(self.sock.recv(UPDATE_RES_LEN))[0]
+                with self.cursor_lock:
+                    cursor = self.cursor.get()
+                    self.sock.sendall(cursor.pack())
+                    self.cursor.put(cursor)
+                new_move_count, cursor_count = unpack_update_res(self.sock.recv(UPDATE_RES_LEN))
                 for _ in range(new_move_count):
                     self.incoming_moves.put(Move().unpack(self.sock.recv(MOVE_LEN)))
+                while not self.cursors.empty():
+                    self.cursors.get()
+                print(cursor_count)
+                for _ in range(cursor_count):
+                    self.cursors.put(Cursor().unpack(self.sock.recv(CURSOR_LEN)))
                 
             
     def shutdown(self):
@@ -153,6 +177,9 @@ Do a jigsaw puzzle. Puzzle dimensions must be odd. The port (default=7777) must 
                 pass
         print("Done.")
 
+        sock.sendall(IDX_REQ)
+        idx = unpack_idx(sock.recv(IDX_LEN))[0]
+
         if not args.server:
             print("Downloading image...")
             sock.sendall(INIT_REQ)
@@ -160,7 +187,7 @@ Do a jigsaw puzzle. Puzzle dimensions must be odd. The port (default=7777) must 
             img = pickle.loads(sock.recv(img_size, socket.MSG_WAITALL))
             print("Done")
 
-        moveplexer = Moveplexer(sock)
+        moveplexer = Moveplexer(sock, idx)
     else:
         print("Error: a game mode argume is required [-o | -c | -s]")
         sys.exit()
@@ -192,11 +219,12 @@ Do a jigsaw puzzle. Puzzle dimensions must be odd. The port (default=7777) must 
     pan_y = ph / 2 - sh / scale / 2
 
     holding = None
+    cursor_pos = (0, 0)
 
     running = True
     while running:
         if not args.offline:
-            holding = moveplexer.update(puzzle, holding)
+            holding = moveplexer.update(puzzle, holding, cursor_pos)
 
         for event in pg.event.get():
             if event.type == pg.QUIT:
@@ -237,6 +265,7 @@ Do a jigsaw puzzle. Puzzle dimensions must be odd. The port (default=7777) must 
                 elif event.button == 3:
                     panning = False
             elif event.type == pg.MOUSEMOTION:
+                cursor_pos = event.pos
                 mx = event.rel[0] / scale
                 my = event.rel[1] / scale
                 if panning:
