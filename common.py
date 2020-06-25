@@ -60,6 +60,10 @@ class Move():
             self.x, self.y = int(piece.disp_x), int(piece.disp_y)
 
 
+    def __str__(self):
+        return f"piece: ({self.r}, {self.c}), pos: ({self.x}, {self.y})"
+
+
     def pack(self):
         return struct.pack(MOVE_FMT, self.r, self.c, self.x, self.y)
 
