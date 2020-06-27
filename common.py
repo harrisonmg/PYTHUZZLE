@@ -72,6 +72,7 @@ class Move():
         self.r, self.c, self.x, self.y = struct.unpack(MOVE_FMT, string)
         return self
 
+
 class Cursor():
     def __init__(self, idx=0, x=0, y=0, pr=-1, pc=-1, px=0, py=0):
         self.idx = idx

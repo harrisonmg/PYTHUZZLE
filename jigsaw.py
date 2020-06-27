@@ -19,21 +19,19 @@ server_process = None
 viewer_process = None
 
 
+if __name__ == '__main__':
+    manager = mp.Manager()
+    cursors = manager.dict()
+
+
 class Moveplexer():
     def __init__(self, sock, idx):
         self.incoming_moves = mp.Queue()
         self.outgoing_moves = mp.Queue()
-        self.cursors1 = mp.Queue()
-        self.cursors2 = mp.Queue()
-        self.cursors1_lock = mp.Lock()
-        self.cursors2_lock = mp.Lock()
-        self.cur_cursors = mp.Value('b')
-        self.cur_cursors = 1
-        self.cursors_lock = mp.Lock()
         self.cursor = mp.Queue(1)
         self.cursor.put(Cursor(idx).pack())
         self.cursor_lock = mp.Lock()
-        self.proc = mp.Process(target=self.run, args=(sock,))
+        self.proc = mp.Process(target=self.run, args=(sock, cursors,))
         self.proc.start()
     
 
@@ -48,27 +46,10 @@ class Moveplexer():
             return self.incoming_moves.get()
 
             
-    def get_cursors(self, other=False):
-        if not other:
-            if self.cur_cursors == 1:
-                return (self.cursors1, self.cursors1_lock)
-            else:
-                return (self.cursors2, self.cursors2_lock)
-        else:
-            if self.cur_cursors == 1:
-                return (self.cursors2, self.cursors2_lock)
-            else:
-                return (self.cursors1, self.cursors1_lock)
+    def get_cursors(self):
+        return cursors.values()
 
                 
-    def swap_cursors(self):
-        with self.cursors_lock:
-            if self.cur_cursors == 1:
-                self.cur_cursors = 2
-            else:
-                self.cur_cursors = 1
-
-        
     def update(self, puzzle, holding, cursor_pos):
         move = self.get_move()
         while move != None:
@@ -91,7 +72,7 @@ class Moveplexer():
         return holding
 
         
-    def run(self, sock):
+    def run(self, sock, cursors):
         update_time = time.time()
         update_interval = 0.1
         try:
@@ -113,14 +94,14 @@ class Moveplexer():
                     for _ in range(new_move_count):
                         self.incoming_moves.put(Move().unpack(sock.recv(MOVE_LEN)))
 
-                    cursors, lock = self.get_cursors(True)
-                    with lock:
-                        while not cursors.empty():
-                            cursors.get()
-                        for _ in range(cursor_count):
-                            c = Cursor().unpack(sock.recv(CURSOR_LEN))
-                            cursors.put(c)
-                    self.swap_cursors()
+                    updated = set()
+                    for _ in range(cursor_count):
+                        c = Cursor().unpack(sock.recv(CURSOR_LEN))
+                        cursors[c.idx] = c
+                        updated.add(c.idx)
+                    for i in cursors.keys():
+                        if i not in updated:
+                            cursors.pop(i)
         except struct.error:
             pass
                 
@@ -338,20 +319,15 @@ Do a jigsaw puzzle. Puzzle dimensions must be odd. The port (default=7777) must 
         screen.fill(BG_COLOR)
         screen.blit(puzzle.subsurface(int(ss_x), int(ss_y), int(ss_width), int(ss_height), scale), (blit_x, blit_y))
 
-        with moveplexer.cursors_lock:
-            cursors, lock = moveplexer.get_cursors()
-            with lock:
-                for _ in range(cursors.qsize()):
-                    cursor = cursors.get()
-                    if (pan_x < cursor.x < pan_x + sw / scale and
-                        pan_y < cursor.y < pan_y + sh / scale):
-                        screen.blit(cursor_img, (int((cursor.x - pan_x) * scale), int((cursor.y - pan_y) * scale)))
-                    if (cursor.pr != -1 and cursor.pc != -1):
-                        p = puzzle.matrix[(cursor.pr, cursor.pc)]
-                        if holding == p: holding = None
-                        dx, dy = cursor.px - p.disp_x, cursor.py - p.disp_y
-                        puzzle.move_piece(p, dx, dy)
-                    cursors.put(cursor)
+        for cursor in moveplexer.get_cursors():
+            if (pan_x < cursor.x < pan_x + sw / scale and
+                pan_y < cursor.y < pan_y + sh / scale):
+                screen.blit(cursor_img, (int((cursor.x - pan_x) * scale), int((cursor.y - pan_y) * scale)))
+            if (cursor.pr != -1 and cursor.pc != -1):
+                p = puzzle.matrix[(cursor.pr, cursor.pc)]
+                if holding == p: holding = None
+                dx, dy = cursor.px - p.disp_x, cursor.py - p.disp_y
+                puzzle.move_piece(p, dx, dy)
 
         pg.display.flip()
 
