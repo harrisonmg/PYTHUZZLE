@@ -31,6 +31,7 @@ class Piece():
     MID = 12
     MDR = 13
 
+
     def __init__(self, img, crop, ptype, row, col, x_ext, y_ext):
         self.sprite = pg.image.fromstring(img.tobytes("raw", 'RGBA'), img.size, 'RGBA')
         self.crop = pg.image.fromstring(crop.tobytes("raw", 'RGB'), crop.size, 'RGB')
@@ -63,6 +64,7 @@ class Piece():
         else:
             return self.disp_y
         
+
     def place(self):
         self.disp_x, self.disp_y = self.x, self.y
 

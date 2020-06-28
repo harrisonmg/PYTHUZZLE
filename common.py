@@ -9,9 +9,13 @@ BLACK = (0, 0, 0)
 
 REQ_LEN = len("a".encode())
 
+IMG_REQ = "g".encode()
+IMG_FMT = ">III"
+IMG_RES_LEN = len(struct.pack(IMG_FMT, 1, 2, 3))
+
 INIT_REQ = "i".encode()
-INIT_FMT = ">III"
-INIT_RES_LEN = len(struct.pack(INIT_FMT, 1, 2, 3))
+INIT_FMT = ">I"
+INIT_RES_LEN = len(struct.pack(INIT_FMT, 1))
 
 UPDATE_REQ = "u".encode()
 UPDATE_FMT = ">II"
@@ -29,8 +33,16 @@ CURSOR_FMT = ">Iddiidd"
 CURSOR_LEN = len(struct.pack(CURSOR_FMT, 0, 1, 2, 3, 4, 5, 6))
 
 
-def pack_init_res(img_size, w, h):
-    return struct.pack(INIT_FMT, img_size, w, h)
+def pack_img_res(img_size, w, h):
+    return struct.pack(IMG_FMT, img_size, w, h)
+
+
+def unpack_img_res(msg):
+    return struct.unpack(IMG_FMT, msg)
+
+
+def pack_init_res(move_count):
+    return struct.pack(INIT_FMT, move_count)
 
 
 def unpack_init_res(msg):

@@ -16,11 +16,12 @@ def main():
     img = Image.open(img_path)
     puzzle = Puzzle(img, int(W), int(H))
     moves = []
+    initial_moves = []
     for p in puzzle.pieces:
-        moves.append(Move(p).pack())
+        initial_moves.append(Move(p).pack())
 
     img_bytes = pickle.dumps(img)
-    init_res = pack_init_res(len(img_bytes), W, H)
+    img_res = pack_img_res(len(img_bytes), W, H)
 
     lsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     lsock.bind(("0.0.0.0", port))
@@ -49,9 +50,13 @@ def main():
                 req = sock.recv(REQ_LEN)
                 if req == IDX_REQ:
                     sock.sendall(pack_idx(indices[sock]))
-                elif req == INIT_REQ:
-                    sock.sendall(init_res)
+                elif req == IMG_REQ:
+                    sock.sendall(img_res)
                     sock.sendall(img_bytes)
+                elif req == INIT_REQ:
+                    sock.sendall(pack_init_res(len(initial_moves)))
+                    for m in initial_moves:
+                        sock.sendall(m)
                 elif req == UPDATE_REQ:
                     idx = indices[sock]
                     cursors[indices[sock]] = sock.recv(CURSOR_LEN)

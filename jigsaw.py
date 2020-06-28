@@ -27,13 +27,13 @@ if __name__ == '__main__':
 
 class Moveplexer():
     def __init__(self, sock, idx):
+        self.sock = sock
         self.incoming_moves = mp.Queue()
         self.outgoing_moves = mp.Queue()
         self.cursor = mp.Queue(1)
         self.cursor.put(Cursor(idx).pack())
         self.cursor_lock = mp.Lock()
         self.proc = mp.Process(target=self.run, args=(sock, cursors,))
-        self.proc.start()
     
 
     def send_move(self, piece):
@@ -49,6 +49,15 @@ class Moveplexer():
             
     def get_cursors(self):
         return cursors.values()
+
+        
+    def init_puzzle(self, puzzle):
+        self.sock.sendall(INIT_REQ)
+        move_count = unpack_init_res(self.sock.recv(INIT_RES_LEN))[0]
+        for _ in range(move_count):
+            move = Move().unpack(self.sock.recv(MOVE_LEN))
+            p = puzzle.matrix[(move.r, move.c)]
+            puzzle.place_piece(p, move.x, move.y)
 
                 
     def update(self, puzzle, holding, cursor_pos):
@@ -71,6 +80,10 @@ class Moveplexer():
             self.cursor.put(cursor.pack())
             
         return holding
+
+
+    def start_process(self):
+        self.proc.start()
 
         
     def run(self, sock, cursors):
@@ -251,8 +264,8 @@ The port (default=7777) must be forwarded to host an online game.
 
         if not args.server:
             print("Downloading image...")
-            sock.sendall(INIT_REQ)
-            img_size, width, height = unpack_init_res(sock.recv(INIT_RES_LEN))
+            sock.sendall(IMG_REQ)
+            img_size, width, height = unpack_img_res(sock.recv(IMG_RES_LEN))
             img = pickle.loads(sock.recv(img_size, socket.MSG_WAITALL))
             print("Done.")
 
@@ -270,6 +283,7 @@ The port (default=7777) must be forwarded to host an online game.
     display_flags = pg.RESIZABLE
     print("Building puzzle...")
     puzzle = Puzzle(img, int(width), int(height))
+    if not args.offline: moveplexer.init_puzzle(puzzle)
     print("Done.")
 
     if not args.no_viewer:
@@ -293,6 +307,7 @@ The port (default=7777) must be forwarded to host an online game.
     cursor_img = pg.image.load('cursor.png')
     cursor_img = pg.transform.scale(cursor_img, (int(cursor_img.get_width() / 2), int(cursor_img.get_height() / 2)))
 
+    if not args.offline: moveplexer.start_process()
     running = True
     while running:
         if not args.offline:
