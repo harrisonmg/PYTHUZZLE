@@ -1,4 +1,5 @@
 import argparse
+from math import sqrt
 import multiprocessing as mp
 import os
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
@@ -74,7 +75,7 @@ class Moveplexer():
         
     def run(self, sock, cursors):
         update_time = time.time()
-        update_interval = 0.1
+        update_interval = 1 / 30
         try:
             while True:
                 while not self.outgoing_moves.empty():
@@ -125,15 +126,17 @@ def open_image_viewer(img):
 
 def main():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter, description="""
-Do a jigsaw puzzle. Puzzle dimensions must be odd. The port (default=7777) must be forwarded to host an online game.
+Do a jigsaw puzzle.
+The puzzle will attempt to hit the desired piece count while keeping the pieces square.
+The port (default=7777) must be forwarded to host an online game.
 
     Install dependencies:
     
         python3 -m pip install -r requirements.txt
 
-    Start a 3x3 offline game:
+    Start a ~100 piece offline game:
 
-        python3 jigsaw.py -o rock.png 3 3
+        python3 jigsaw.py -o rock.png 100
 
     Join an online game:
 
@@ -141,33 +144,82 @@ Do a jigsaw puzzle. Puzzle dimensions must be odd. The port (default=7777) must 
 
     Host an 11x11 online game:
 
-        python3 jigsaw.py -s itachi.png 11 11""")
+        python3 jigsaw.py -s itachi.png -d 11 11""")
 
+    parser.add_argument('piece_count', help="Piece count to attempt to hit when cutting puzzle",
+                        nargs='*', metavar='PIECE_COUNT', type=int, default=False)
     parser.add_argument('-o', '--offline', help="Play an offline game",
-                        nargs=3, metavar=('IMAGE', 'WIDTH', 'HEIGHT'), default=False)
+                        metavar='IMAGE', default=False)
     parser.add_argument('-c', '--connect', help="Connect to an online game",
                         metavar='SERVER_IP', default=False)
     parser.add_argument('-s', '--server', help="Host an online game",
-                        nargs=3, metavar=('IMAGE', 'WIDTH', 'HEIGHT'), default=False)
+                        metavar='IMAGE', default=False)
     parser.add_argument('-p', '--port', help="Port to connect to or host from",
                         default="7777")
-    parser.add_argument('-d', '--downscale', help="Locally downscale the resolution of the puzzle's largest dimension. Not currently compatible with online.",
-                        metavar='RESOLUTION', type=int, default=-1)
+    parser.add_argument('-d', '--dimensions', help="Specify puzzle dimensions (pieces)",
+                        nargs=2, metavar=('WIDTH', 'HEIGHT'), type=int, default=False)
     parser.add_argument('-n', '--no-viewer', help="Don't open an accompanying image viewer",
                         action='store_true', default=False)
-    parser.add_argument('-e', '--escape-exit', help="Let the escape key exit the program.",
+    parser.add_argument('-e', '--escape-exit', help="Let the escape key exit the program",
                         action='store_true', default=False)
     args = parser.parse_args()
 
-    if args.offline:
-        img_path, W, H = args.offline;
+    if args.offline or args.server:
+        if args.offline:
+            img_path = args.offline
+        else:
+            img_path = args.server
         img = Image.open(img_path)
-        pass
-    elif args.server or args.connect:
-        args.downscale = -1
+        
+        if args.dimensions:
+            width, height = args.dimensions
+        else:
+            if not args.piece_count:
+                print("Error: Missing puzzle piece count or dimensions")
+                sys.exit()
+            elif len(args.piece_count) > 1:
+                print("Error: Too many piece count arguments given, should be 1")
+            else:
+                pc = args.piece_count[0]
+                if pc < 1:
+                    print("Error: Piece count must be positive")
+                    sys.exit()
+                ratio = img.size[0] / img.size[1]
+                height = sqrt(pc / ratio)
+                width = ratio * height   
+
+                width = int(width)
+                height = int(height)
+
+                if width % 2 == 0 and height % 2 == 0:
+                    add = abs((width + 1) * (height + 1) - pc)
+                    sub = abs((width - 1) * (height - 1) - pc)
+                    if add < sub:
+                        width += 1
+                        height += 1
+                    else:
+                        width -= 1
+                        height -= 1
+                elif width % 2 == 0:
+                    add = abs((width + 1) * height - pc)
+                    sub = abs((width - 1) * height - pc)
+                    if add < sub:
+                        width += 1
+                    else:
+                        width -= 1
+                elif height % 2 == 0:
+                    add = abs(width * (height + 1) - pc)
+                    sub = abs(width * (height - 1) - pc)
+                    if add < sub:
+                        height += 1
+                    else:
+                        height -= 1
+
+                width = max(3, width)
+                height = max(3, height)
+
+    if args.server or args.connect:
         if args.server:
-            img_path, W, H = args.server;
-            img = Image.open(img_path)
             print("Starting server...")
             global server_process
 
@@ -175,7 +227,7 @@ Do a jigsaw puzzle. Puzzle dimensions must be odd. The port (default=7777) must 
                 py_cmd = "python3"
             else:
                 py_cmd = "python"
-            server_process = subprocess.Popen([py_cmd, "server.py", args.port, img_path, W, H])
+            server_process = subprocess.Popen([py_cmd, "server.py", args.port, img_path, str(width), str(height)])
             args.connect = socket.gethostname()
         else:
             print("Connecting to server...")
@@ -183,9 +235,10 @@ Do a jigsaw puzzle. Puzzle dimensions must be odd. The port (default=7777) must 
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         start_time = time.time()
         while True:
-            if time.time() - start_time > 10:
-                print("Error: Could not connect to server. Retrying...")
-                start_time = time.time()
+            if time.time() - start_time > 60:
+                print("Error: Could not connect to server")
+                sys.exit(1)
+                # start_time = time.time()
             try:
                 sock.connect((args.connect, int(args.port)))
                 break
@@ -199,13 +252,13 @@ Do a jigsaw puzzle. Puzzle dimensions must be odd. The port (default=7777) must 
         if not args.server:
             print("Downloading image...")
             sock.sendall(INIT_REQ)
-            img_size, W, H = unpack_init_res(sock.recv(INIT_RES_LEN))
+            img_size, width, height = unpack_init_res(sock.recv(INIT_RES_LEN))
             img = pickle.loads(sock.recv(img_size, socket.MSG_WAITALL))
             print("Done.")
 
         moveplexer = Moveplexer(sock, idx)
-    else:
-        print("Error: a game mode argume is required [-o | -c | -s]")
+    elif not args.offline:
+        print("Error: A game mode argume is required [-o | -c | -s]")
         sys.exit()
 
     pg.init()
@@ -216,7 +269,7 @@ Do a jigsaw puzzle. Puzzle dimensions must be odd. The port (default=7777) must 
 
     display_flags = pg.RESIZABLE
     print("Building puzzle...")
-    puzzle = Puzzle(img, int(W), int(H), downscale=args.downscale)
+    puzzle = Puzzle(img, int(width), int(height))
     print("Done.")
 
     if not args.no_viewer:
@@ -319,15 +372,16 @@ Do a jigsaw puzzle. Puzzle dimensions must be odd. The port (default=7777) must 
         screen.fill(BG_COLOR)
         screen.blit(puzzle.subsurface(int(ss_x), int(ss_y), int(ss_width), int(ss_height), scale), (blit_x, blit_y))
 
-        for cursor in moveplexer.get_cursors():
-            if (pan_x < cursor.x < pan_x + sw / scale and
-                pan_y < cursor.y < pan_y + sh / scale):
-                screen.blit(cursor_img, (int((cursor.x - pan_x) * scale), int((cursor.y - pan_y) * scale)))
-            if (cursor.pr != -1 and cursor.pc != -1):
-                p = puzzle.matrix[(cursor.pr, cursor.pc)]
-                if holding == p: holding = None
-                dx, dy = cursor.px - p.disp_x, cursor.py - p.disp_y
-                puzzle.move_piece(p, dx, dy)
+        if not args.offline:
+            for cursor in moveplexer.get_cursors():
+                if (pan_x < cursor.x < pan_x + sw / scale and
+                    pan_y < cursor.y < pan_y + sh / scale):
+                    screen.blit(cursor_img, (int((cursor.x - pan_x) * scale), int((cursor.y - pan_y) * scale)))
+                if (cursor.pr != -1 and cursor.pc != -1):
+                    p = puzzle.matrix[(cursor.pr, cursor.pc)]
+                    if holding == p: holding = None
+                    dx, dy = cursor.px - p.disp_x, cursor.py - p.disp_y
+                    puzzle.move_piece(p, dx, dy)
 
         pg.display.flip()
 
