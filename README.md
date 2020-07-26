@@ -15,7 +15,7 @@ An online multiplayer jigsaw puzzle.
 usage: jigsaw.py [-h] [-o IMAGE WIDTH HEIGHT] [-c SERVER_IP]
                  [-s IMAGE WIDTH HEIGHT] [-p PORT] [-d RESOLUTION] [-n] [-e]
 
-Do a jigsaw puzzle. Puzzle dimensions must be odd. The port (default=7777) must be forwarded to host an online game.
+Do a jigsaw puzzle. The port (default=7777) must be forwarded to host an online game.
 
     Install dependencies:
 

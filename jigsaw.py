@@ -201,35 +201,11 @@ The port (default=7777) must be forwarded to host an online game.
                 height = sqrt(pc / ratio)
                 width = ratio * height   
 
-                width = int(width)
-                height = int(height)
+                width = int(width + 0.5)
+                height = int(height + 0.5)
 
-                if width % 2 == 0 and height % 2 == 0:
-                    add = abs((width + 1) * (height + 1) - pc)
-                    sub = abs((width - 1) * (height - 1) - pc)
-                    if add < sub:
-                        width += 1
-                        height += 1
-                    else:
-                        width -= 1
-                        height -= 1
-                elif width % 2 == 0:
-                    add = abs((width + 1) * height - pc)
-                    sub = abs((width - 1) * height - pc)
-                    if add < sub:
-                        width += 1
-                    else:
-                        width -= 1
-                elif height % 2 == 0:
-                    add = abs(width * (height + 1) - pc)
-                    sub = abs(width * (height - 1) - pc)
-                    if add < sub:
-                        height += 1
-                    else:
-                        height -= 1
-
-                width = max(3, width)
-                height = max(3, height)
+                width = max(2, width)
+                height = max(2, height)
 
     if args.server or args.connect:
         if args.server:
@@ -392,7 +368,7 @@ The port (default=7777) must be forwarded to host an online game.
                 if (pan_x < cursor.x < pan_x + sw / scale and
                     pan_y < cursor.y < pan_y + sh / scale):
                     screen.blit(cursor_img, (int((cursor.x - pan_x) * scale), int((cursor.y - pan_y) * scale)))
-                if (cursor.pr != -1 and cursor.pc != -1):
+                if cursor.pr != -1 and cursor.pc != -1:
                     p = puzzle.matrix[(cursor.pr, cursor.pc)]
                     if holding == p: holding = None
                     dx, dy = cursor.px - p.disp_x, cursor.py - p.disp_y

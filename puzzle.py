@@ -16,20 +16,22 @@ def rect_overlap(r1, r2):
 
 class Piece():
     # piece types
-    TLC = 0
-    TRC = 1
-    BLC = 2
-    BRC = 3
-    BEE = 4
-    TEE = 5
-    BOE = 6
-    TOE = 7
-    ROE = 8
-    LOE = 9
-    REE = 10
-    LEE = 11
-    MID = 12
-    MDR = 13
+    TLC = 0   # top left corner
+    TRC = 1   # top right corner
+    BLC = 2   # bottom left corner
+    BRC = 3   # bottom right corner
+    BEE = 4   # bottom even edge
+    TEE = 5   # top even edge
+    BOE = 6   # bottom odd edge
+    TOE = 7   # top odd edge
+    ROE = 8   # right odd edge 
+    LOE = 9   # left odd edge
+    REE = 10  # right even edge
+    LEE = 11  # left even edge
+    MID = 12  # middle piece
+    MDR = 13  # middle piece rotated
+    TRE = 14  # top right corner even
+    BLE = 15  # bottom left corner even
 
 
     def __init__(self, img, crop, ptype, row, col, x_ext, y_ext):
@@ -59,7 +61,8 @@ class Piece():
 
 
     def sy(self):
-        if self.ptype in (self.BOE, self.REE, self.LEE, self.MDR):
+        if self.ptype in (self.BOE, self.REE, self.LEE,
+                          self.MDR, self.BLE):
             return self.disp_y - self.y_ext
         else:
             return self.disp_y
@@ -71,8 +74,8 @@ class Piece():
 
 class Puzzle():
     def __init__(self, img, width, height, downscale=-1, margin=2):
-        if width % 2 == 0 or height % 2 == 0 or width <= 1 or height <= 1:
-            raise ValueError("Puzzle dimensions must be greater than 1 and odd")
+        if width <= 1 or height <= 1:
+            raise ValueError("Puzzle dimensions must be greater than 1")
         img_w, img_h = img.size
 
         if downscale > 0 and max(img.size) > downscale:
@@ -101,43 +104,54 @@ class Puzzle():
         self.width, self.height = width, height
         self.img, self.img_w, self.img_h = img, img_w, img_h
         self.piece_w, self.piece_h = piece_w, piece_h
-        self.x_ext, self.y_ext = x_ext, y_ext
         self.connect_tol = min(piece_w, piece_h) / 5
 
         self.pieces = []
         self.matrix = {}
         for r in range(height):
             for c in range(width):
-                if (r == 0 and c == 0):
+                if r == 0 and c == 0:
                     # top left corner
                     ptype = Piece.TLC
                     base = Image.open("corner.png")
                     mask = Image.open("corner_blur.png")
                     crop = img.crop((0, 0, piece_w + x_ext, piece_h))
-                elif (r == 0 and c == width - 1):
+                elif r == 0 and c == width - 1:
                     # top right corner
-                    ptype = Piece.TRC
-                    base = Image.open("corner.png").transpose(Image.FLIP_LEFT_RIGHT)
-                    mask = Image.open("corner_blur.png").transpose(Image.FLIP_LEFT_RIGHT)
-                    crop = img.crop((img_w - piece_w - x_ext, 0, img_w, piece_h))
-                elif (r == height - 1 and c == 0):
+                    if width % 2 == 0:
+                        ptype = Piece.TRE
+                        base = Image.open("corner.png").transpose(Image.ROTATE_270)
+                        mask = Image.open("corner_blur.png").transpose(Image.ROTATE_270)
+                        crop = img.crop((img_w - piece_w, 0, img_w, piece_h + y_ext))
+                    else:
+                        ptype = Piece.TRC
+                        base = Image.open("corner.png").transpose(Image.FLIP_LEFT_RIGHT)
+                        mask = Image.open("corner_blur.png").transpose(Image.FLIP_LEFT_RIGHT)
+                        crop = img.crop((img_w - piece_w - x_ext, 0, img_w, piece_h))
+                elif r == height - 1 and c == 0:
                     # bottom left corner
-                    ptype = Piece.BLC
-                    base = Image.open("corner.png").transpose(Image.FLIP_TOP_BOTTOM)
-                    mask = Image.open("corner_blur.png").transpose(Image.FLIP_TOP_BOTTOM)
-                    crop = img.crop((0, img_h - piece_h, piece_w + x_ext, img_h))
-                elif (r == height - 1 and c == width - 1):
+                    if height % 2 == 0:
+                        ptype = Piece.BLE
+                        base = Image.open("corner.png").transpose(Image.ROTATE_90)
+                        mask = Image.open("corner_blur.png").transpose(Image.ROTATE_90)
+                        crop = img.crop((0, img_h - piece_h - y_ext, piece_w, img_h))
+                    else:
+                        ptype = Piece.BLC
+                        base = Image.open("corner.png").transpose(Image.FLIP_TOP_BOTTOM)
+                        mask = Image.open("corner_blur.png").transpose(Image.FLIP_TOP_BOTTOM)
+                        crop = img.crop((0, img_h - piece_h, piece_w + x_ext, img_h))
+                elif r == height - 1 and c == width - 1:
                     # bottom right corner
                     ptype = Piece.BRC
                     base = Image.open("corner.png").transpose(Image.FLIP_LEFT_RIGHT).transpose(Image.FLIP_TOP_BOTTOM)
                     mask = Image.open("corner_blur.png").transpose(Image.FLIP_LEFT_RIGHT).transpose(Image.FLIP_TOP_BOTTOM)
                     crop = img.crop((img_w - piece_w - x_ext, img_h - piece_h, img_w, img_h))
-                elif (r == 0 or r == height - 1):
+                elif r == 0 or r == height - 1:
                     # horizontal edge
-                    if (c % 2 == 0):
+                    if bool(c % 2 == 0) ^ bool(height % 2 == 0 and r == height - 1):
                         base = Image.open("even_edge.png")
                         mask = Image.open("even_edge_blur.png")
-                        if (r == height - 1):
+                        if r == height - 1:
                             # bottom edge
                             ptype = Piece.BEE
                             base = base.transpose(Image.FLIP_TOP_BOTTOM)
@@ -150,7 +164,7 @@ class Puzzle():
                     else:
                         base = Image.open("odd_edge.png")
                         mask = Image.open("odd_edge_blur.png")
-                        if (r == height - 1):
+                        if r == height - 1:
                             # bottom edge
                             ptype = Piece.BOE
                             base = base.transpose(Image.FLIP_TOP_BOTTOM)
@@ -160,12 +174,12 @@ class Puzzle():
                             # top edge
                             ptype = Piece.TOE
                             crop = img.crop((c * piece_w, 0, (c + 1) * piece_w, piece_h + y_ext))
-                elif (c == 0 or c == width - 1):
+                elif c == 0 or c == width - 1:
                     # vertical edge (switch odd and even edges)
-                    if (r % 2 == 0):
+                    if bool(r % 2 == 0) ^ bool(width % 2 == 0 and c == width - 1):
                         base = Image.open("odd_edge.png")
                         mask = Image.open("odd_edge_blur.png")
-                        if (c == width - 1):
+                        if c == width - 1:
                             # right edge
                             ptype = Piece.ROE
                             base = base.transpose(Image.ROTATE_270)
@@ -180,7 +194,7 @@ class Puzzle():
                     else:
                         base = Image.open("even_edge.png")
                         mask = Image.open("even_edge_blur.png")
-                        if (c == width - 1):
+                        if c == width - 1:
                             # right edge
                             ptype = Piece.REE
                             base = base.transpose(Image.ROTATE_270)
@@ -192,7 +206,7 @@ class Puzzle():
                             base = base.transpose(Image.ROTATE_90)
                             mask = mask.transpose(Image.ROTATE_90)
                             crop = img.crop((0, r * piece_h - y_ext, piece_w, (r + 1) * piece_h + y_ext))
-                elif (r % 2 == c % 2):
+                elif r % 2 == c % 2:
                     ptype = Piece.MID
                     base = Image.open("middle.png")
                     mask = Image.open("middle_blur.png")
@@ -211,7 +225,7 @@ class Puzzle():
                 self.pieces.append(piece)
                 self.matrix[(r, c)] = piece
 
-                if (random.choice([True, False])):
+                if random.choice([True, False]):
                     piece.x = random.choice([random.randrange(int(img_w / 2), int(self.origin_x - piece.w)),
                                             random.randrange(int(self.origin_x + img_w + piece.x - piece.sx()),
                                                              int(self.w - img_w / 2))])
@@ -239,9 +253,9 @@ class Puzzle():
     def move_piece(self, piece, dx, dy):
         if piece.locked: return
         for p in piece.group:
-            if (p.sx() + dx < 0 or p.sx() + dx + p.w > self.w):
+            if p.sx() + dx < 0 or p.sx() + dx + p.w > self.w:
                 dx = 0
-            if (p.sy() + dy < 0 or p.sy() + dy + p.h > self.h):
+            if p.sy() + dy < 0 or p.sy() + dy + p.h > self.h:
                 dy = 0
             if dx == 0 and dy == 0:
                 break
@@ -319,8 +333,7 @@ class Puzzle():
         if piece.locked: return
         def check_single(other, tx, ty):
             dx, dy = tx - piece.x, ty - piece.y
-            if (abs(dx) < self.connect_tol and
-                abs(dy) < self.connect_tol):
+            if abs(dx) < self.connect_tol and abs(dy) < self.connect_tol:
                 if piece.locked:
                     self.place_piece(other, other.x - dx, other.y - dy)
                 else:
@@ -349,23 +362,22 @@ class Puzzle():
             check_single(n, n.x - self.piece_w, n.y)
         
         def check_corner(dx, dy):
-            if (abs(dx) < self.connect_tol and
-                abs(dy) < self.connect_tol):
+            if abs(dx) < self.connect_tol and abs(dy) < self.connect_tol:
                 self.place_piece(piece, piece.x + dx, piece.y + dy)
                 for p in piece.group:
                     p.locked = True
 
-        if (piece.row == 0):
-            if (piece.col == 0):
+        if piece.row == 0:
+            if piece.col == 0:
                 check_corner(self.origin_x - piece.x,
                              self.origin_y - piece.y)
-            elif (piece.col == self.width - 1):
+            elif piece.col == self.width - 1:
                 check_corner(self.origin_x + self.img_w - self.piece_w - piece.x,
                              self.origin_y - piece.y)
-        if (piece.row == self.height - 1):
-            if (piece.col == 0):
+        if piece.row == self.height - 1:
+            if piece.col == 0:
                 check_corner(self.origin_x - piece.x,
                              self.origin_y + self.img_h - self.piece_h - piece.y)
-            elif (piece.col == self.width - 1):
+            elif piece.col == self.width - 1:
                 check_corner(self.origin_x + self.img_w - self.piece_w - piece.x,
                              self.origin_y + self.img_h - self.piece_h - piece.y)
