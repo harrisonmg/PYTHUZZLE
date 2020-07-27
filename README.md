@@ -2,6 +2,11 @@
 
 An online multiplayer jigsaw puzzle.
 
+## Installation
+* Download and install [Python3](https://www.python.org/downloads/)
+* Install dependencies with `py -m pip install -r requirements.txt`. Replace `py` with `python3` for non-Windows platforms.
+* Consult the usage information below to run.
+
 ## Controls
 | Key          | Action        |
 |--------------|---------------|
