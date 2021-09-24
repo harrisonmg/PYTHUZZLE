@@ -1,10 +1,10 @@
+# fmt: off
 import argparse
 from math import sqrt
 import multiprocessing as mp
 import os
-os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
+import pickle
 import platform
-import pygame as pg
 import socket
 import struct
 import subprocess
@@ -12,8 +12,15 @@ import sys
 import time
 import uuid
 
-from common import *
+from PIL import Image
+os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
+import pygame as pg
+
+from common import (BG_COLOR, Cursor, CURSOR_LEN, IDX_LEN, IDX_REQ, IMG_RES_LEN, IMG_REQ,
+                    INIT_RES_LEN, INIT_REQ, Move, MOVE_LEN, MOVE_REQ, unpack_idx, unpack_img_res,
+                    unpack_init_res, unpack_update_res, UPDATE_RES_LEN, UPDATE_REQ)
 from puzzle import Puzzle
+# fmt: on
 
 
 server_process = None
@@ -34,58 +41,52 @@ class Moveplexer():
         self.cursor.put(Cursor(idx).pack())
         self.cursor_lock = mp.Lock()
         self.proc = mp.Process(target=self.run, args=(sock, cursors,))
-    
 
     def send_move(self, piece):
         self.outgoing_moves.put(Move(piece))
 
-        
     def get_move(self):
         if self.incoming_moves.empty():
             return None
         else:
             return self.incoming_moves.get()
 
-            
     def get_cursors(self):
         return cursors.values()
 
-        
     def init_puzzle(self, puzzle):
         self.sock.sendall(INIT_REQ)
         move_count = unpack_init_res(self.sock.recv(INIT_RES_LEN))[0]
         for _ in range(move_count):
-            move = Move().unpack(self.sock.recv(MOVE_LEN))
+            move = Move.unpack(self.sock.recv(MOVE_LEN))
             p = puzzle.matrix[(move.r, move.c)]
             puzzle.place_piece(p, move.x, move.y)
 
-                
     def update(self, puzzle, holding, cursor_pos):
         move = self.get_move()
-        while move != None:
+        while move is not None:
             p = puzzle.matrix[(move.r, move.c)]
             puzzle.place_piece(p, move.x, move.y)
             puzzle.connection_check(p)
-            if holding in p.group: holding = None
+            if holding in p.group:
+                holding = None
             move = self.get_move()
 
         with self.cursor_lock:
-            cursor = Cursor().unpack(self.cursor.get())
+            cursor = Cursor.unpack(self.cursor.get())
             cursor.x, cursor.y = cursor_pos
-            if holding == None:
+            if holding is None:
                 cursor.pr, cursor.pc = -1, -1
             else:
                 cursor.pr, cursor.pc = holding.row, holding.col
                 cursor.px, cursor.py = holding.disp_x, holding.disp_y
             self.cursor.put(cursor.pack())
-            
-        return holding
 
+        return holding
 
     def start_process(self):
         self.proc.start()
 
-        
     def run(self, sock, cursors):
         update_time = time.time()
         update_interval = 1 / 30
@@ -106,11 +107,11 @@ class Moveplexer():
                     new_move_count, cursor_count = unpack_update_res(sock.recv(UPDATE_RES_LEN))
 
                     for _ in range(new_move_count):
-                        self.incoming_moves.put(Move().unpack(sock.recv(MOVE_LEN)))
+                        self.incoming_moves.put(Move.unpack(sock.recv(MOVE_LEN)))
 
                     updated = set()
                     for _ in range(cursor_count):
-                        c = Cursor().unpack(sock.recv(CURSOR_LEN))
+                        c = Cursor.unpack(sock.recv(CURSOR_LEN))
                         cursors[c.idx] = c
                         updated.add(c.idx)
                     for i in cursors.keys():
@@ -118,12 +119,11 @@ class Moveplexer():
                             cursors.pop(i)
         except struct.error:
             pass
-                
-            
+
     def shutdown(self):
         self.proc.terminate()
 
-        
+
 def open_image_viewer(img):
     try:
         os.mkdir("image_cache")
@@ -144,7 +144,7 @@ The puzzle will attempt to hit the desired piece count while keeping the pieces 
 The port (default=7777) must be forwarded to host an online game.
 
     Install dependencies:
-    
+
         python3 -m pip install -r requirements.txt
 
     Start a ~100 piece offline game:
@@ -183,7 +183,7 @@ The port (default=7777) must be forwarded to host an online game.
         else:
             img_path = args.server
         img = Image.open(img_path)
-        
+
         if args.dimensions:
             width, height = args.dimensions
         else:
@@ -199,7 +199,7 @@ The port (default=7777) must be forwarded to host an online game.
                     sys.exit()
                 ratio = img.size[0] / img.size[1]
                 height = sqrt(pc / ratio)
-                width = ratio * height   
+                width = ratio * height
 
                 width = int(width + 0.5)
                 height = int(height + 0.5)
@@ -216,7 +216,8 @@ The port (default=7777) must be forwarded to host an online game.
                 py_cmd = "python3"
             else:
                 py_cmd = "python"
-            server_process = subprocess.Popen([py_cmd, "server.py", args.port, img_path, str(width), str(height)])
+            server_process = subprocess.Popen(
+                [py_cmd, "server.py", args.port, img_path, str(width), str(height)])
             args.connect = socket.gethostname()
         else:
             print("Connecting to server...")
@@ -231,7 +232,7 @@ The port (default=7777) must be forwarded to host an online game.
             try:
                 sock.connect((args.connect, int(args.port)))
                 break
-            except:
+            except Exception:
                 pass
         print("Done.")
 
@@ -259,7 +260,8 @@ The port (default=7777) must be forwarded to host an online game.
     display_flags = pg.RESIZABLE
     print("Building puzzle...")
     puzzle = Puzzle(img, int(width), int(height))
-    if not args.offline: moveplexer.init_puzzle(puzzle)
+    if not args.offline:
+        moveplexer.init_puzzle(puzzle)
     print("Done.")
 
     if not args.no_viewer:
@@ -281,9 +283,11 @@ The port (default=7777) must be forwarded to host an online game.
     mouse_pos = (0, 0)
     cursor_pos = (0, 0)
     cursor_img = pg.image.load('cursor.png')
-    cursor_img = pg.transform.scale(cursor_img, (int(cursor_img.get_width() / 2), int(cursor_img.get_height() / 2)))
+    cursor_img = pg.transform.scale(
+        cursor_img, (int(cursor_img.get_width() / 2), int(cursor_img.get_height() / 2)))
 
-    if not args.offline: moveplexer.start_process()
+    if not args.offline:
+        moveplexer.start_process()
     running = True
     while running:
         if not args.offline:
@@ -303,7 +307,8 @@ The port (default=7777) must be forwarded to host an online game.
                 screen = pg.display.set_mode([sw, sh], flags=display_flags)
             elif event.type == pg.MOUSEBUTTONDOWN:
                 if event.button == 1:
-                    holding = puzzle.click_check(pan_x + event.pos[0] / scale, pan_y + event.pos[1] / scale)
+                    holding = puzzle.click_check(
+                        pan_x + event.pos[0] / scale, pan_y + event.pos[1] / scale)
                 elif event.button == 3:
                     panning = True
                 elif event.button in (4, 5):
@@ -318,7 +323,7 @@ The port (default=7777) must be forwarded to host an online game.
                     pan_y -= sh / scale / 2
             elif event.type == pg.MOUSEBUTTONUP:
                 if event.button == 1:
-                    if holding != None:
+                    if holding is not None:
                         if args.offline:
                             puzzle.place_piece(holding, holding.disp_x, holding.disp_y)
                             puzzle.connection_check(holding)
@@ -334,7 +339,7 @@ The port (default=7777) must be forwarded to host an online game.
                 if panning:
                     pan_x -= mx
                     pan_y -= my
-                elif holding != None:
+                elif holding is not None:
                     puzzle.move_piece(holding, mx, my)
 
         ss_width = min(max(1, sw / scale), pw)
@@ -361,29 +366,37 @@ The port (default=7777) must be forwarded to host an online game.
             ss_height = max(ph - pan_y, 0)
 
         screen.fill(BG_COLOR)
-        screen.blit(puzzle.subsurface(int(ss_x), int(ss_y), int(ss_width), int(ss_height), scale), (blit_x, blit_y))
+        screen.blit(puzzle.subsurface(int(ss_x), int(ss_y), int(
+            ss_width), int(ss_height), scale), (blit_x, blit_y))
 
         if not args.offline:
             for cursor in moveplexer.get_cursors():
-                if (pan_x < cursor.x < pan_x + sw / scale and
-                    pan_y < cursor.y < pan_y + sh / scale):
-                    screen.blit(cursor_img, (int((cursor.x - pan_x) * scale), int((cursor.y - pan_y) * scale)))
+                if (
+                    pan_x < cursor.x < pan_x + sw / scale and
+                    pan_y < cursor.y < pan_y + sh / scale
+                ):
+                    tinted_cursor_img = cursor_img.copy()
+                    tinted_cursor_img.fill(cursor.color, special_flags=pg.BLEND_MIN)
+                    screen.blit(tinted_cursor_img,
+                                (int((cursor.x - pan_x) * scale), int((cursor.y - pan_y) * scale)))
                 if cursor.pr != -1 and cursor.pc != -1:
                     p = puzzle.matrix[(cursor.pr, cursor.pc)]
-                    if holding == p: holding = None
+                    if holding == p:
+                        holding = None
                     dx, dy = cursor.px - p.disp_x, cursor.py - p.disp_y
                     puzzle.move_piece(p, dx, dy)
 
-        pg.display.flip()
+        pg.display.update()
 
         cursor_pos = (mouse_pos[0] / scale + pan_x, mouse_pos[1] / scale + pan_y)
-        
+
         if puzzle.complete() and pg.mixer.get_init() and not pg.mixer.music.get_busy():
             pg.mixer.music.load('congrats.wav')
             pg.mixer.music.set_volume(1)
             pg.mixer.music.play(-1)
 
-    if not args.offline: moveplexer.shutdown()
+    if not args.offline:
+        moveplexer.shutdown()
     pg.quit()
 
 
@@ -391,7 +404,7 @@ if __name__ == "__main__":
     try:
         main()
     finally:
-        if server_process != None:
+        if server_process is not None:
             server_process.kill()
-        if viewer_process != None:
+        if viewer_process is not None:
             viewer_process.kill()

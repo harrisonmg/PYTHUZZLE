@@ -1,4 +1,4 @@
-# ROMPECABEZAS
+# Rompecabezas
 
 An online multiplayer jigsaw puzzle.
 

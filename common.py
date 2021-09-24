@@ -1,5 +1,4 @@
-import pickle
-from PIL import Image
+from random import randrange
 import struct
 
 
@@ -29,8 +28,8 @@ IDX_REQ = "d".encode()
 IDX_FMT = ">I"
 IDX_LEN = len(struct.pack(IDX_FMT, 1))
 
-CURSOR_FMT = ">Iddiidd"
-CURSOR_LEN = len(struct.pack(CURSOR_FMT, 0, 1, 2, 3, 4, 5, 6))
+CURSOR_FMT = ">IddiiddBBB"
+CURSOR_LEN = len(struct.pack(CURSOR_FMT, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9))
 
 
 def pack_img_res(img_size, w, h):
@@ -56,7 +55,7 @@ def pack_update_res(move_count, cursor_count):
 def unpack_update_res(msg):
     return struct.unpack(UPDATE_FMT, msg)
 
-    
+
 def pack_idx(idx):
     return struct.pack(IDX_FMT, idx)
 
@@ -67,26 +66,25 @@ def unpack_idx(msg):
 
 class Move():
     def __init__(self, piece=None):
-        if piece != None:
+        if piece is not None:
             self.r, self.c = int(piece.row), int(piece.col)
             self.x, self.y = int(piece.disp_x), int(piece.disp_y)
-
 
     def __str__(self):
         return f"piece: ({self.r}, {self.c}), pos: ({self.x}, {self.y})"
 
-
     def pack(self):
         return struct.pack(MOVE_FMT, self.r, self.c, self.x, self.y)
 
-
+    @classmethod
     def unpack(self, string):
-        self.r, self.c, self.x, self.y = struct.unpack(MOVE_FMT, string)
-        return self
+        ret = Move()
+        ret.r, ret.c, ret.x, ret.y = struct.unpack(MOVE_FMT, string)
+        return ret
 
 
 class Cursor():
-    def __init__(self, idx=0, x=0, y=0, pr=-1, pc=-1, px=0, py=0):
+    def __init__(self, idx=0, x=0, y=0, pr=-1, pc=-1, px=0, py=0, r=None, g=None, b=None):
         self.idx = idx
         self.x = x
         self.y = y
@@ -94,10 +92,15 @@ class Cursor():
         self.pc = pc
         self.px = px
         self.py = py
-    
+        if None in (r, g, b):
+            self.color = (randrange(256), randrange(256), randrange(256))
+        else:
+            self.color = (r, g, b)
+
     def pack(self):
-        return struct.pack(CURSOR_FMT, self.idx, self.x, self.y, self.pr, self.pc, self.px, self.py)
-    
+        return struct.pack(
+            CURSOR_FMT, self.idx, self.x, self.y, self.pr, self.pc, self.px, self.py, *self.color)
+
+    @classmethod
     def unpack(self, string):
-        self.idx, self.x, self.y, self.pr, self.pc, self.px, self.py = struct.unpack(CURSOR_FMT, string)
-        return self
+        return Cursor(*struct.unpack(CURSOR_FMT, string))

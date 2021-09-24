@@ -1,9 +1,12 @@
-from PIL import Image
+import pickle
 import select
 import socket
 import sys
 
-from common import *
+from PIL import Image
+
+from common import (Cursor, CURSOR_LEN, IDX_REQ, IMG_REQ, INIT_REQ, Move, MOVE_LEN, MOVE_REQ,
+                    pack_idx, pack_img_res, pack_init_res, pack_update_res, REQ_LEN, UPDATE_REQ)
 from puzzle import Puzzle
 
 
