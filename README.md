@@ -1,4 +1,4 @@
-# Friendly Jigsaw
+# ROMPECABEZAS
 
 An online multiplayer jigsaw puzzle.
 
