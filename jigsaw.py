@@ -27,9 +27,8 @@ server_process = None
 viewer_process = None
 
 
-if __name__ == '__main__':
-    manager = mp.Manager()
-    cursors = manager.dict()
+manager = mp.Manager()
+cursors = manager.dict()
 
 
 class Moveplexer():
@@ -137,7 +136,7 @@ def open_image_viewer(img):
         subprocess.run([image_viewer, filename], stdout=shutup, stderr=shutup, shell=shell)
 
 
-def main():
+def main(argv):
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter, description="""
 Do a jigsaw puzzle.
 The puzzle will attempt to hit the desired piece count while keeping the pieces square.
@@ -175,7 +174,7 @@ The port (default=7777) must be forwarded to host an online game.
                         action='store_true', default=False)
     parser.add_argument('-e', '--escape-exit', help="Let the escape key exit the program",
                         action='store_true', default=False)
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     if args.offline or args.server:
         if args.offline:
@@ -400,11 +399,15 @@ The port (default=7777) must be forwarded to host an online game.
     pg.quit()
 
 
-if __name__ == "__main__":
+def run(argv):
     try:
-        main()
+        main(argv)
     finally:
         if server_process is not None:
             server_process.kill()
         if viewer_process is not None:
             viewer_process.kill()
+
+
+if __name__ == "__main__":
+    run(sys.argv[1:])
