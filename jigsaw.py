@@ -17,8 +17,8 @@ os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 import pygame as pg
 
 from common import (BG_COLOR, Cursor, CURSOR_LEN, IDX_LEN, IDX_REQ, IMG_RES_LEN, IMG_REQ,
-                    INIT_RES_LEN, INIT_REQ, Move, MOVE_LEN, MOVE_REQ, unpack_idx, unpack_img_res,
-                    unpack_init_res, unpack_update_res, UPDATE_RES_LEN, UPDATE_REQ)
+                    INIT_RES_LEN, INIT_REQ, Move, MOVE_LEN, MOVE_REQ, resource_path, unpack_idx,
+                    unpack_img_res, unpack_init_res, unpack_update_res, UPDATE_RES_LEN, UPDATE_REQ)
 from puzzle import Puzzle
 # fmt: on
 
@@ -125,10 +125,10 @@ class Moveplexer():
 
 def open_image_viewer(img):
     try:
-        os.mkdir("image_cache")
+        os.mkdir(resource_path("image_cache"))
     except FileExistsError:
         pass
-    filename = "image_cache/" + str(uuid.uuid4()) + ".png"
+    filename = resource_path("image_cache/" + str(uuid.uuid4()) + ".png")
     img.save(filename)
     image_viewer = {'linux': 'xdg-open', 'win32': 'start', 'darwin': 'open'}[sys.platform]
     shell = sys.platform == 'win32'
@@ -281,7 +281,7 @@ The port (default=7777) must be forwarded to host an online game.
     holding = None
     mouse_pos = (0, 0)
     cursor_pos = (0, 0)
-    cursor_img = pg.image.load('cursor.png')
+    cursor_img = pg.image.load(resource_path('cursor.png'))
     cursor_img = pg.transform.scale(
         cursor_img, (int(cursor_img.get_width() / 2), int(cursor_img.get_height() / 2)))
 
@@ -390,7 +390,7 @@ The port (default=7777) must be forwarded to host an online game.
         cursor_pos = (mouse_pos[0] / scale + pan_x, mouse_pos[1] / scale + pan_y)
 
         if puzzle.complete() and pg.mixer.get_init() and not pg.mixer.music.get_busy():
-            pg.mixer.music.load('congrats.wav')
+            pg.mixer.music.load(resource_path('congrats.wav'))
             pg.mixer.music.set_volume(1)
             pg.mixer.music.play(-1)
 

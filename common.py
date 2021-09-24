@@ -1,5 +1,16 @@
+import os
 from random import randrange
 import struct
+import sys
+
+
+def resource_path(relative_path):
+    try:
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
 
 
 BG_COLOR = (44, 47, 51)
