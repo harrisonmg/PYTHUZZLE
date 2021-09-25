@@ -2,10 +2,10 @@
 
 An online multiplayer jigsaw puzzle.
 
-## Installation
-* Download and install [Python3](https://www.python.org/downloads/)
-* Install dependencies with `py -m pip install -r requirements.txt`. Replace `py` with `python3` for non-Windows platforms.
-* Consult the usage information below to run.
+## How to Play
+
+* Download the all-in-one executable for your OS from the [most recent release](https://github.com/harrisonmg/rompecabezas/releases).
+* Run and enjoy!
 
 ## Controls
 | Key          | Action        |
@@ -15,7 +15,12 @@ An online multiplayer jigsaw puzzle.
 | Scroll Wheel | Zoom          |
 | Space        | Center Puzzle |
 
-## Usage
+## Manual Installation
+* Download and install [Python3](https://www.python.org/downloads/)
+* Install dependencies with `python3 -m pip install -r requirements.txt`. Replace `python3` with `py` for Windows platforms.
+* Consult the usage information below to run.
+
+## CLI Usage
 ```
 usage: jigsaw.py [-h] [-o IMAGE WIDTH HEIGHT] [-c SERVER_IP]
                  [-s IMAGE WIDTH HEIGHT] [-p PORT] [-d RESOLUTION] [-n] [-e]

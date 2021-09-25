@@ -5,12 +5,10 @@ import sys
 
 
 def resource_path(relative_path):
-    try:
-        base_path = sys._MEIPASS
-    except Exception:
-        base_path = os.path.abspath(".")
-
-    return os.path.join(base_path, relative_path)
+    if '_MEIPASS2' in os.environ:
+        return os.path.join(os.environ['_MEIPASS2'], relative_path)
+    else:
+        return relative_path
 
 
 BG_COLOR = (44, 47, 51)

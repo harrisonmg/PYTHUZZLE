@@ -209,7 +209,7 @@ The port (default=7777) must be forwarded to host an online game.
             else:
                 py_cmd = "python"
             server_process = subprocess.Popen(
-                [py_cmd, "server.py", args.port, img_path, str(width), str(height)])
+                [py_cmd, resource_path("server.py"), args.port, img_path, str(width), str(height)])
             args.connect = socket.gethostname()
         else:
             print("Connecting to server...")
