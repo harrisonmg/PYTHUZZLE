@@ -27,12 +27,8 @@ server_process = None
 viewer_process = None
 
 
-manager = mp.Manager()
-cursors = manager.dict()
-
-
 class Moveplexer():
-    def __init__(self, sock, idx):
+    def __init__(self, sock, idx, cursors):
         self.sock = sock
         self.incoming_moves = mp.Queue()
         self.outgoing_moves = mp.Queue()
@@ -49,9 +45,6 @@ class Moveplexer():
             return None
         else:
             return self.incoming_moves.get()
-
-    def get_cursors(self):
-        return cursors.values()
 
     def init_puzzle(self, puzzle):
         self.sock.sendall(INIT_REQ)
@@ -245,7 +238,9 @@ The port (default=7777) must be forwarded to host an online game.
             img = pickle.loads(sock.recv(img_size, socket.MSG_WAITALL))
             print("Done.")
 
-        moveplexer = Moveplexer(sock, idx)
+        manager = mp.Manager()
+        cursors = manager.dict()
+        moveplexer = Moveplexer(sock, idx, cursors)
     elif not args.offline:
         print("Error: A game mode argume is required [-o | -c | -s]")
         sys.exit()
@@ -268,6 +263,10 @@ The port (default=7777) must be forwarded to host an online game.
 
     sw, sh = 1500, 1000
     screen = pg.display.set_mode([sw, sh], flags=display_flags)
+
+    icon = pg.image.load(resource_path('icon.ico'))
+    pg.display.set_icon(icon)
+    pg.display.set_caption('Rompecabezas')
 
     pw, ph = puzzle.w, puzzle.h
     scale = min(sw / pw, sh / ph)
@@ -369,7 +368,7 @@ The port (default=7777) must be forwarded to host an online game.
             ss_width), int(ss_height), scale), (blit_x, blit_y))
 
         if not args.offline:
-            for cursor in moveplexer.get_cursors():
+            for cursor in cursors.values():
                 if (
                     pan_x < cursor.x < pan_x + sw / scale and
                     pan_y < cursor.y < pan_y + sh / scale

@@ -4,4 +4,4 @@ test_images
 build
 dist
 errors.txt
-gui.spec
+*.spec
