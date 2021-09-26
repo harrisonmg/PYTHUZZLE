@@ -7,6 +7,8 @@ import sys
 def resource_path(relative_path):
     if '_MEIPASS2' in os.environ:
         return os.path.join(os.environ['_MEIPASS2'], relative_path)
+    elif '_MEIPASS' in os.environ:
+        return os.path.join(os.environ['_MEIPASS'], relative_path)
     else:
         return relative_path
 
