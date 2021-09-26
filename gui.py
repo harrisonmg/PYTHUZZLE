@@ -1,3 +1,5 @@
+import multiprocessing as mp
+
 import PySimpleGUI as gui
 
 from common import resource_path
@@ -5,6 +7,8 @@ from jigsaw import run
 
 
 if __name__ == '__main__':
+    mp.freeze_support()
+
     [gui.Text('Image'), gui.Input(size=(20, 11), key='image')]
 
     join_layout = [[gui.Text('IP Address'), gui.Input(size=(20, 11), key='ip')],

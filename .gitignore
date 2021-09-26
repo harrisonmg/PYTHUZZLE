@@ -4,4 +4,3 @@ test_images
 build
 dist
 errors.txt
-*.spec
