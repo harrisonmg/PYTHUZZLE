@@ -4,7 +4,6 @@ from math import sqrt
 import multiprocessing as mp
 import os
 import pickle
-import platform
 import socket
 import struct
 import subprocess
@@ -20,10 +19,10 @@ from common import (BG_COLOR, Cursor, CURSOR_LEN, IDX_LEN, IDX_REQ, IMG_RES_LEN,
                     INIT_RES_LEN, INIT_REQ, Move, MOVE_LEN, MOVE_REQ, resource_path, unpack_idx,
                     unpack_img_res, unpack_init_res, unpack_update_res, UPDATE_RES_LEN, UPDATE_REQ)
 from puzzle import Puzzle
+import server
 # fmt: on
 
 
-server_process = None
 viewer_process = None
 
 
@@ -35,7 +34,7 @@ class Moveplexer():
         self.cursor = mp.Queue(1)
         self.cursor.put(Cursor(idx).pack())
         self.cursor_lock = mp.Lock()
-        self.proc = mp.Process(target=self.run, args=(sock, cursors,))
+        self.proc = mp.Process(target=self.run, args=(sock, cursors,), daemon=True)
 
     def send_move(self, piece):
         self.outgoing_moves.put(Move(piece))
@@ -112,11 +111,9 @@ class Moveplexer():
         except struct.error:
             pass
 
-    def shutdown(self):
-        self.proc.terminate()
-
 
 def open_image_viewer(img):
+    global viewer_process
     try:
         os.mkdir(resource_path("image_cache"))
     except FileExistsError:
@@ -126,7 +123,8 @@ def open_image_viewer(img):
     image_viewer = {'linux': 'xdg-open', 'win32': 'start', 'darwin': 'open'}[sys.platform]
     shell = sys.platform == 'win32'
     with open(os.devnull, 'wb') as shutup:
-        subprocess.run([image_viewer, filename], stdout=shutup, stderr=shutup, shell=shell)
+        viewer_process = subprocess.Popen(
+            [image_viewer, filename], stdout=shutup, stderr=shutup, shell=shell)
 
 
 def main(argv):
@@ -202,14 +200,9 @@ The port (default=7777) must be forwarded to host an online game.
     if args.server or args.connect:
         if args.server:
             print("Starting server...")
-            global server_process
-
-            if platform.system() == 'Linux':
-                py_cmd = "python3"
-            else:
-                py_cmd = "python"
-            server_process = subprocess.Popen(
-                [py_cmd, resource_path("server.py"), args.port, img_path, str(width), str(height)])
+            server_proc = mp.Process(
+                target=server.run, args=(int(args.port), img_path, width, height), daemon=True)
+            server_proc.start()
             args.connect = socket.gethostname()
         else:
             print("Connecting to server...")
@@ -220,7 +213,6 @@ The port (default=7777) must be forwarded to host an online game.
             if time.time() - start_time > 60:
                 print("Error: Could not connect to server")
                 sys.exit(1)
-                # start_time = time.time()
             try:
                 sock.connect((args.connect, int(args.port)))
                 break
@@ -393,8 +385,6 @@ The port (default=7777) must be forwarded to host an online game.
             pg.mixer.music.set_volume(1)
             pg.mixer.music.play(-1)
 
-    if not args.offline:
-        moveplexer.shutdown()
     pg.quit()
 
 
@@ -402,8 +392,6 @@ def run(argv):
     try:
         main(argv)
     finally:
-        if server_process is not None:
-            server_process.kill()
         if viewer_process is not None:
             viewer_process.kill()
 

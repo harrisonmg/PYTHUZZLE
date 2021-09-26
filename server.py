@@ -1,7 +1,6 @@
 import pickle
 import select
 import socket
-import sys
 
 from PIL import Image
 
@@ -10,12 +9,7 @@ from common import (Cursor, CURSOR_LEN, IDX_REQ, IMG_REQ, INIT_REQ, Move, MOVE_L
 from puzzle import Puzzle
 
 
-def main():
-    port = int(sys.argv[1])
-    img_path = sys.argv[2]
-    W = int(sys.argv[3])
-    H = int(sys.argv[4])
-
+def run(port, img_path, W, H):
     img = Image.open(img_path)
     puzzle = Puzzle(img, int(W), int(H))
     moves = []
@@ -82,7 +76,3 @@ def main():
                     print("Error: unknown request type " + str(req))
         except socket.error as exc:
             print("Socket error: " + str(exc))
-
-
-if __name__ == "__main__":
-    main()
