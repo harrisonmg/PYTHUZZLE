@@ -28,6 +28,24 @@ def run(port, img_path, W, H):
     cursors = {}
 
     to_read = [lsock]
+
+    def try_recv(sock, size):
+        try:
+            return sock.recv(size)
+        except ConnectionResetError:
+            print("Server: Client disconnected.")
+            to_read.remove(sock)
+            return None
+
+    def try_send(sock, data):
+        try:
+            sock.sendall(data)
+            return True
+        except ConnectionResetError:
+            print("Server: Client disconnected.")
+            to_read.remove(sock)
+            return False
+
     while True:
         try:
             ready_to_read, ready_to_write, in_error = \
@@ -41,38 +59,47 @@ def run(port, img_path, W, H):
                     indices[csock] = idx
                     cursors[idx] = Cursor(idx).pack()
                     to_read.append(csock)
-                    print("Server: Client connected")
+                    print("Server: Client connected.")
                     continue
 
-                req = sock.recv(REQ_LEN)
+                req = try_recv(sock, REQ_LEN)
+                if req is None:
+                    continue
+
                 if req == IDX_REQ:
-                    sock.sendall(pack_idx(indices[sock]))
+                    try_send(sock, pack_idx(indices[sock]))
                 elif req == IMG_REQ:
-                    sock.sendall(img_res)
-                    sock.sendall(img_bytes)
+                    try_send(sock, img_res)
+                    try_send(sock, img_bytes)
                 elif req == INIT_REQ:
-                    sock.sendall(pack_init_res(len(initial_moves)))
+                    try_send(sock, pack_init_res(len(initial_moves)))
                     for m in initial_moves:
-                        sock.sendall(m)
+                        try_send(sock, m)
                 elif req == UPDATE_REQ:
                     idx = indices[sock]
-                    cursors[indices[sock]] = sock.recv(CURSOR_LEN)
+                    res = try_recv(sock, CURSOR_LEN)
+                    if res is None:
+                        continue
+                    cursors[indices[sock]] = res
                     cpos = clients[sock]
-                    sock.sendall(pack_update_res(len(moves) - cpos, len(cursors) - 1))
+                    try_send(sock, pack_update_res(len(moves) - cpos, len(cursors) - 1))
                     while cpos < len(moves):
-                        sock.sendall(moves[cpos])
+                        try_send(sock, moves[cpos])
                         cpos += 1
                     clients[sock] = cpos
                     for i, c in cursors.items():
                         if i != idx:
-                            sock.sendall(c)
+                            try_send(sock, c)
                 elif req == MOVE_REQ:
-                    moves.append(sock.recv(MOVE_LEN))
+                    res = try_recv(sock, MOVE_LEN)
+                    if res is None:
+                        continue
+                    moves.append(res)
                 elif req == bytes():
-                    print("Server: Client disconnected")
+                    print("Server: Client disconnected.")
                     cursors.pop(indices[sock])
                     to_read.remove(sock)
                 else:
-                    print("Error: unknown request type " + str(req))
+                    print("Server Error: unknown request type: " + str(req))
         except socket.error as exc:
-            print("Socket error: " + str(exc))
+            print("Server: Socket error: " + str(exc))
