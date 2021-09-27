@@ -29,12 +29,16 @@ def run(port, img_path, W, H):
 
     to_read = [lsock]
 
+    def client_disconnect(sock):
+        cursors.pop(indices[sock])
+        to_read.remove(sock)
+
     def try_recv(sock, size):
         try:
             return sock.recv(size)
         except ConnectionResetError:
             print("Server: Client disconnected.")
-            to_read.remove(sock)
+            client_disconnect(sock)
             return None
 
     def try_send(sock, data):
@@ -43,7 +47,7 @@ def run(port, img_path, W, H):
             return True
         except ConnectionResetError:
             print("Server: Client disconnected.")
-            to_read.remove(sock)
+            client_disconnect(sock)
             return False
 
     while True:
@@ -97,8 +101,7 @@ def run(port, img_path, W, H):
                     moves.append(res)
                 elif req == bytes():
                     print("Server: Client disconnected.")
-                    cursors.pop(indices[sock])
-                    to_read.remove(sock)
+                    client_disconnect(sock)
                 else:
                     print("Server Error: unknown request type: " + str(req))
         except socket.error as exc:
