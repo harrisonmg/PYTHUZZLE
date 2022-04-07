@@ -2,6 +2,9 @@
 
 An online multiplayer jigsaw puzzle.
 
+## Disclaimer
+Code- and organization-wise, this project is pretty sloppy. But it works well enough to enjoy with my friends, so I'm leaving as is for now.
+
 ## How to Play
 
 * Download the all-in-one executable for your OS from the [most recent release](https://github.com/harrisonmg/rompecabezas/releases).
