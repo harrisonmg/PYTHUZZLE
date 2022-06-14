@@ -2,6 +2,8 @@
 
 An online multiplayer jigsaw puzzle.
 
+![image](https://user-images.githubusercontent.com/3968357/173490836-a3577f42-20b6-466e-a964-5034682d3b9f.png)
+
 ## Disclaimer
 Code- and organization-wise, this project is pretty sloppy. But it works well enough to enjoy with my friends, so I'm leaving as is for now.
 
